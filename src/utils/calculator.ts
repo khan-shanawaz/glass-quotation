@@ -1,4 +1,4 @@
-export type GlassCategory = 'door' | 'window' | 'mirror' | 'frame' | 'custom';
+export type GlassCategory = string;
 
 export interface GlassItemInput {
   id: string;

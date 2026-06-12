@@ -9,7 +9,7 @@ import { exportToCSV, parseCSV } from '@/utils/csvHelper';
 function QuotationListContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { savedQuotations, deleteQuotation, convertQuoteToProject, companyProfile, importQuotations, updateQuotation } = useQuotation();
+  const { savedQuotations, deleteQuotation, convertQuoteToProject, companyProfile, importQuotations, updateQuotation, categories } = useQuotation();
   
   const [selectedQuote, setSelectedQuote] = useState<SavedQuotation | null>(null);
 
@@ -365,6 +365,18 @@ function QuotationListContent() {
                       Convert to Project
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/print-preview?id=${selectedQuote.id}`)}
+                    className="btn btn-secondary"
+                    style={{ color: 'var(--primary)', borderColor: 'var(--primary-glow)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                    Export to Edit PDF
+                  </button>
                   <button type="button" onClick={handlePrint} className="btn btn-primary">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#030712" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
                       <polyline points="6 9 6 2 18 2 18 9" />
@@ -545,13 +557,13 @@ function QuotationListContent() {
                                   className="table-inline-input"
                                   style={{ textTransform: 'capitalize', width: '100%', padding: '2px', borderBottom: '1px dashed var(--glass-border)' }}
                                   value={item.category}
-                                  onChange={(e) => handleUpdateItem(item.id!, { category: e.target.value as GlassCategory })}
+                                  onChange={(e) => handleUpdateItem(item.id!, { category: e.target.value })}
                                 >
-                                  <option value="door" style={{ background: '#0e1420' }}>Door</option>
-                                  <option value="window" style={{ background: '#0e1420' }}>Window</option>
-                                  <option value="mirror" style={{ background: '#0e1420' }}>Mirror</option>
-                                  <option value="frame" style={{ background: '#0e1420' }}>Frame</option>
-                                  <option value="custom" style={{ background: '#0e1420' }}>Custom</option>
+                                  {categories.map((cat) => (
+                                    <option key={cat} value={cat} style={{ background: '#0e1420', textTransform: 'capitalize' }}>
+                                      {cat}
+                                    </option>
+                                  ))}
                                 </select>
                               </div>
                               <span className="print-only" style={{ textTransform: 'capitalize' }}>

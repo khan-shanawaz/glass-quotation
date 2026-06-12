@@ -88,6 +88,10 @@ interface QuotationContextType {
   convertQuoteToProject: (quoteId: string) => void;
   updateProjectStatus: (projectId: string, status: ProjectStatus) => void;
   deleteProject: (projectId: string) => void;
+  categories: string[];
+  addCategory: (name: string) => void;
+  removeCategory: (name: string) => void;
+  updateCategory: (index: number, newName: string) => void;
   updateCompanyProfile: (profile: CompanyProfile) => void;
   resetCompanyProfile: () => void;
   importQuotations: (quotes: SavedQuotation[]) => void;
@@ -126,6 +130,7 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
+  const [categories, setCategories] = useState<string[]>(['door', 'window', 'mirror', 'frame', 'custom']);
 
   // Load state from localStorage on client-side mount
   useEffect(() => {
@@ -134,6 +139,7 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const localProjects = localStorage.getItem('glass_saas_projects');
     const localCustomers = localStorage.getItem('glass_saas_customers');
     const localProfile = localStorage.getItem('glass_saas_profile');
+    const localCategories = localStorage.getItem('glass_saas_categories');
 
     if (localDraft) {
       try { setDraft(JSON.parse(localDraft)); } catch (e) { console.error(e); }
@@ -149,6 +155,9 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
     if (localProfile) {
       try { setCompanyProfile(JSON.parse(localProfile)); } catch (e) { console.error(e); }
+    }
+    if (localCategories) {
+      try { setCategories(JSON.parse(localCategories)); } catch (e) { console.error(e); }
     }
   }, []);
 
@@ -171,6 +180,10 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const saveLocalProfile = (newProfile: CompanyProfile) => {
     localStorage.setItem('glass_saas_profile', JSON.stringify(newProfile));
+  };
+
+  const saveLocalCategories = (newCats: string[]) => {
+    localStorage.setItem('glass_saas_categories', JSON.stringify(newCats));
   };
 
   const updateDraftInfo = (info: Partial<Omit<DraftQuotation, 'items'>>) => {
@@ -470,6 +483,36 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   };
 
+  const addCategory = (name: string) => {
+    const trimmed = name.trim().toLowerCase();
+    if (!trimmed) return;
+    setCategories((prev) => {
+      if (prev.includes(trimmed)) return prev;
+      const updated = [...prev, trimmed];
+      saveLocalCategories(updated);
+      return updated;
+    });
+  };
+
+  const removeCategory = (name: string) => {
+    setCategories((prev) => {
+      const updated = prev.filter((c) => c !== name);
+      saveLocalCategories(updated);
+      return updated;
+    });
+  };
+
+  const updateCategory = (index: number, newName: string) => {
+    const trimmed = newName.trim().toLowerCase();
+    if (!trimmed) return;
+    setCategories((prev) => {
+      const updated = [...prev];
+      updated[index] = trimmed;
+      saveLocalCategories(updated);
+      return updated;
+    });
+  };
+
   return (
     <QuotationContext.Provider
       value={{
@@ -494,6 +537,10 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         importQuotations,
         importProjects,
         importCustomers,
+        categories,
+        addCategory,
+        removeCategory,
+        updateCategory,
       }}
     >
       {children}

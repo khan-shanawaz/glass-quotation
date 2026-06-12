@@ -23,7 +23,11 @@ export default function QuotationCreatorPage() {
     updateDraftItem,
     removeDraftItem,
     clearDraft,
-    saveQuotation
+    saveQuotation,
+    categories,
+    addCategory,
+    removeCategory,
+    updateCategory
   } = useQuotation();
 
   const quoteCurrency = draft.items[0]?.currencySymbol || '₹';
@@ -35,6 +39,15 @@ export default function QuotationCreatorPage() {
   const [sizeSqFt, setSizeSqFt] = useState('');
   const [quantity, setQuantity] = useState('');
   const [rate, setRate] = useState('120');
+
+  const [isEditingCategories, setIsEditingCategories] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  useEffect(() => {
+    if (categories.length > 0 && !categories.includes(category)) {
+      setCategory(categories[0]);
+    }
+  }, [categories, category]);
 
   // Compute live preview metrics for the current item before adding it
   const [liveResult, setLiveResult] = useState<any>(null);
@@ -124,17 +137,27 @@ export default function QuotationCreatorPage() {
               
               <div className="form-row">
                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                  <label className="form-label">Item Category</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <label className="form-label" style={{ margin: 0 }}>Item Category</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingCategories(true)}
+                      className="btn btn-secondary"
+                      style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '4px', margin: 0 }}
+                    >
+                      Edit Categories
+                    </button>
+                  </div>
                   <select
                     className="form-input form-select"
                     value={category}
-                    onChange={(e) => setCategory(e.target.value as GlassCategory)}
+                    onChange={(e) => setCategory(e.target.value)}
                   >
-                    <option value="door" style={{ background: '#0e1420' }}>Glass Door</option>
-                    <option value="window" style={{ background: '#0e1420' }}>Glass Window</option>
-                    <option value="mirror" style={{ background: '#0e1420' }}>Mirror</option>
-                    <option value="frame" style={{ background: '#0e1420' }}>Frame</option>
-                    <option value="custom" style={{ background: '#0e1420' }}>Custom Fitting</option>
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat} style={{ background: '#0e1420', textTransform: 'capitalize' }}>
+                        {cat}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -561,6 +584,89 @@ export default function QuotationCreatorPage() {
         </div>
 
       </div>
+
+      {isEditingCategories && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '480px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: '24px', gap: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px' }}>
+              <h3 style={{ color: 'var(--primary)', margin: 0 }}>Manage Item Categories</h3>
+              <button 
+                type="button" 
+                onClick={() => setIsEditingCategories(false)}
+                className="btn btn-secondary"
+                style={{ padding: '4px 8px', fontSize: '0.8rem', borderRadius: '4px' }}
+              >
+                Close
+              </button>
+            </div>
+
+            {/* List of current categories */}
+            <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '50vh', paddingRight: '4px' }}>
+              {categories.map((cat, idx) => (
+                <div key={cat} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    style={{ textTransform: 'capitalize', flex: 1, padding: '6px 12px', fontSize: '0.9rem' }}
+                    value={cat}
+                    onChange={(e) => updateCategory(idx, e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeCategory(cat)}
+                    className="btn btn-danger"
+                    style={{ padding: '6px 12px', fontSize: '0.85rem', borderRadius: '4px' }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add Category Form */}
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (newCategoryName.trim()) {
+                  addCategory(newCategoryName.trim());
+                  setNewCategoryName('');
+                }
+              }}
+              style={{ display: 'flex', gap: '10px', borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }}
+            >
+              <input
+                type="text"
+                className="form-input"
+                style={{ flex: 1, fontSize: '0.9rem', padding: '8px 12px' }}
+                placeholder="New Category Name (e.g. Shower Glass)"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                required
+              />
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ fontSize: '0.85rem', padding: '8px 16px', borderRadius: '4px', whiteSpace: 'nowrap' }}
+              >
+                Add Category
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
