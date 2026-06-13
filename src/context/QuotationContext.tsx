@@ -141,7 +141,32 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
   const [categories, setCategories] = useState<string[]>(['door', 'window', 'mirror', 'frame', 'custom']);
 
-  // Load state from localStorage on client-side mount
+  // Database sync helper
+  const triggerDBSync = async (
+    profile = companyProfile,
+    quotes = savedQuotations,
+    projs = projects,
+    custs = customers,
+    cats = categories
+  ) => {
+    try {
+      await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyProfile: profile,
+          savedQuotations: quotes,
+          projects: projs,
+          customers: custs,
+          categories: cats
+        })
+      });
+    } catch (e) {
+      console.error('Failed to post sync to database:', e);
+    }
+  };
+
+  // Load state from localStorage on client-side mount and sync from DB
   useEffect(() => {
     const localDraft = localStorage.getItem('glass_saas_draft');
     const localSaved = localStorage.getItem('glass_saas_saved');
@@ -168,6 +193,41 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (localCategories) {
       try { setCategories(JSON.parse(localCategories)); } catch (e) { console.error(e); }
     }
+
+    // Background sync from Turso/Supabase cloud DB
+    const syncFromDB = async () => {
+      try {
+        const res = await fetch('/api/sync');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            if (data.companyProfile) {
+              setCompanyProfile(data.companyProfile);
+              localStorage.setItem('glass_saas_profile', JSON.stringify(data.companyProfile));
+            }
+            if (data.savedQuotations && data.savedQuotations.length > 0) {
+              setSavedQuotations(data.savedQuotations);
+              localStorage.setItem('glass_saas_saved', JSON.stringify(data.savedQuotations));
+            }
+            if (data.projects && data.projects.length > 0) {
+              setProjects(data.projects);
+              localStorage.setItem('glass_saas_projects', JSON.stringify(data.projects));
+            }
+            if (data.customers && data.customers.length > 0) {
+              setCustomers(data.customers);
+              localStorage.setItem('glass_saas_customers', JSON.stringify(data.customers));
+            }
+            if (data.categories && data.categories.length > 0) {
+              setCategories(data.categories);
+              localStorage.setItem('glass_saas_categories', JSON.stringify(data.categories));
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to sync from database:', err);
+      }
+    };
+    syncFromDB();
   }, []);
 
   // Save updates to localStorage helper functions
@@ -296,6 +356,7 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     // 2. Proactively Upsert Customer Logs in customer records
     const phoneKey = newQuote.customerPhone.trim();
+    let finalCustomers = customers;
     setCustomers((prevCustomers) => {
       const existsIndex = prevCustomers.findIndex(
         (c) => c.phone.trim() === phoneKey && phoneKey !== 'N/A'
@@ -327,12 +388,16 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
       
       saveLocalCustomers(updatedCustomersList);
+      finalCustomers = updatedCustomersList;
       return updatedCustomersList;
     });
 
     // Clear estimator draft values
     clearDraft();
     
+    // Sync to DB
+    triggerDBSync(companyProfile, updatedQuotes, projects, finalCustomers, categories);
+
     return newQuote;
   };
 
@@ -340,6 +405,7 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const updated = savedQuotations.filter((q) => q.id !== id);
     setSavedQuotations(updated);
     saveLocalSaved(updated);
+    triggerDBSync(companyProfile, updated, projects, customers, categories);
   };
 
   const updateQuotation = (id: string, updatedFields: Partial<SavedQuotation>) => {
@@ -366,6 +432,7 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return quote;
       });
       saveLocalSaved(updatedList);
+      triggerDBSync(companyProfile, updatedList, projects, customers, categories);
       return updatedList;
     });
   };
@@ -407,6 +474,7 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     saveLocalProjects(updatedProjectsList);
 
     // Update customer revenue records
+    let finalCustomers = customers;
     setCustomers((prevCustomers) => {
       const updatedCustomersList = prevCustomers.map((c) => {
         if (c.phone.trim() === quote.customerPhone.trim() && quote.customerPhone !== 'N/A') {
@@ -418,29 +486,37 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return c;
       });
       saveLocalCustomers(updatedCustomersList);
+      finalCustomers = updatedCustomersList;
       return updatedCustomersList;
     });
+
+    triggerDBSync(companyProfile, updatedQuotes, updatedProjectsList, finalCustomers, categories);
   };
 
   const updateProjectStatus = (projectId: string, newStatus: ProjectStatus) => {
-    const updatedProjects = projects.map((p) => {
-      if (p.id === projectId) {
-        return { ...p, status: newStatus };
-      }
-      return p;
+    setProjects((prev) => {
+      const updatedProjects = prev.map((p) => {
+        if (p.id === projectId) {
+          return { ...p, status: newStatus };
+        }
+        return p;
+      });
+      saveLocalProjects(updatedProjects);
+      triggerDBSync(companyProfile, savedQuotations, updatedProjects, customers, categories);
+      return updatedProjects;
     });
-    setProjects(updatedProjects);
-    saveLocalProjects(updatedProjects);
   };
 
   const deleteProject = (projectId: string) => {
     const project = projects.find((p) => p.id === projectId);
     if (!project) return;
 
+    let updatedQuotes = savedQuotations;
+
     // Revert quote status back to non-converted
     const quoteIndex = savedQuotations.findIndex((q) => q.id === project.quoteId);
     if (quoteIndex >= 0) {
-      const updatedQuotes = [...savedQuotations];
+      updatedQuotes = [...savedQuotations];
       updatedQuotes[quoteIndex] = {
         ...savedQuotations[quoteIndex],
         isConvertedToProject: false,
@@ -452,16 +528,19 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const updated = projects.filter((p) => p.id !== projectId);
     setProjects(updated);
     saveLocalProjects(updated);
+    triggerDBSync(companyProfile, updatedQuotes, updated, customers, categories);
   };
 
   const updateCompanyProfile = (newProfile: CompanyProfile) => {
     setCompanyProfile(newProfile);
     saveLocalProfile(newProfile);
+    triggerDBSync(newProfile, savedQuotations, projects, customers, categories);
   };
 
   const resetCompanyProfile = () => {
     setCompanyProfile(DEFAULT_COMPANY_PROFILE);
     saveLocalProfile(DEFAULT_COMPANY_PROFILE);
+    triggerDBSync(DEFAULT_COMPANY_PROFILE, savedQuotations, projects, customers, categories);
   };
 
   const importQuotations = (importedQuotes: SavedQuotation[]) => {
@@ -501,6 +580,7 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (prev.includes(trimmed)) return prev;
       const updated = [...prev, trimmed];
       saveLocalCategories(updated);
+      triggerDBSync(companyProfile, savedQuotations, projects, customers, updated);
       return updated;
     });
   };
@@ -509,6 +589,7 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setCategories((prev) => {
       const updated = prev.filter((c) => c !== name);
       saveLocalCategories(updated);
+      triggerDBSync(companyProfile, savedQuotations, projects, customers, updated);
       return updated;
     });
   };
@@ -520,6 +601,7 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const updated = [...prev];
       updated[index] = trimmed;
       saveLocalCategories(updated);
+      triggerDBSync(companyProfile, savedQuotations, projects, customers, updated);
       return updated;
     });
   };
