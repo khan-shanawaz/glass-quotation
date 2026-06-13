@@ -18,6 +18,8 @@ export interface DraftQuotation {
   transportCharges: number;
   labourCharges: number;
   isTaxEnabled?: boolean;
+  sizeHeading?: string;
+  unitHeading?: string;
 }
 
 export interface SavedQuotation {
@@ -36,6 +38,8 @@ export interface SavedQuotation {
   isTaxEnabled?: boolean;
   summary: QuoteSummary;
   isConvertedToProject: boolean;
+  sizeHeading?: string;
+  unitHeading?: string;
 }
 
 export type ProjectStatus = 'planning' | 'production' | 'delivery' | 'installed' | 'completed';
@@ -69,6 +73,7 @@ export interface CompanyProfile {
   taxRate: number; // default 18% GST in India
   logoBase64: string; // Base64 logo data
   termsAndConditions: string;
+  bankDetails?: string;
 }
 
 interface QuotationContextType {
@@ -107,6 +112,7 @@ const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
   taxRate: 18, // 18% GST
   logoBase64: '',
   termsAndConditions: '1. Price is ex-factory. Transportation and installation/labour charges are extra.\n2. 50% advance along with order purchase, balance 50% before delivery.\n3. Goods once sold will not be taken back or exchanged.\n4. Glass breakage after delivery is not our responsibility.\n5. Any disputes are subject to local jurisdiction only.',
+  bankDetails: 'Bank Name: State Bank of India\nAccount No: 123456789012\nIFSC Code: SBIN0001234\nBranch: Gandhinagar',
 };
 
 const INITIAL_DRAFT: DraftQuotation = {
@@ -120,6 +126,8 @@ const INITIAL_DRAFT: DraftQuotation = {
   transportCharges: 0,
   labourCharges: 0,
   isTaxEnabled: true,
+  sizeHeading: 'Size (Sq.Ft.)',
+  unitHeading: 'Qty (Units)',
 };
 
 const QuotationContext = createContext<QuotationContextType | undefined>(undefined);
@@ -276,6 +284,8 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       isTaxEnabled: draft.isTaxEnabled !== false,
       summary,
       isConvertedToProject: false,
+      sizeHeading: draft.sizeHeading || 'Size (Sq.Ft.)',
+      unitHeading: draft.unitHeading || 'Qty (Units)',
     };
 
     // 1. Update Invoices State

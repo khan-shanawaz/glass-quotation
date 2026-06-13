@@ -187,7 +187,7 @@ export default function QuotationCreatorPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="form-group">
-                  <label className="form-label">Size (Sq.Ft.)</label>
+                  <label className="form-label">{draft.sizeHeading || 'Size (Sq.Ft.)'}</label>
                   <input
                     type="number"
                     step="0.01"
@@ -198,7 +198,7 @@ export default function QuotationCreatorPage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Qty (Units)</label>
+                  <label className="form-label">{draft.unitHeading || 'Qty (Units)'}</label>
                   <input
                     type="number"
                     placeholder="Qty"
@@ -210,7 +210,7 @@ export default function QuotationCreatorPage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Price / Sq.Ft.</label>
+                <label className="form-label">Price / {draft.sizeHeading || 'Sq.Ft.'}</label>
                 <div style={{ position: 'relative', width: '100%' }}>
                   <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', lineHeight: '1' }}>₹</span>
                   <input
@@ -231,13 +231,13 @@ export default function QuotationCreatorPage() {
               {liveResult && (
                 <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: '16px', marginTop: '8px', fontSize: '0.85rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Area (Sq.Ft.):</span>
-                    <span style={{ fontWeight: 600 }}>{safeNumber(sizeSqFt, 0).toFixed(2)} Sq.Ft.</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>{draft.sizeHeading || 'Size'}:</span>
+                    <span style={{ fontWeight: 600 }}>{safeNumber(sizeSqFt, 0).toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Formula:</span>
                     <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                      {safeNumber(sizeSqFt, 0).toFixed(2)} sq.ft × {safeNumber(quantity, 1)} qty × ₹{safeNumber(rate, 0)}
+                      {safeNumber(sizeSqFt, 0).toFixed(2)} × {safeNumber(quantity, 1)} qty × ₹{safeNumber(rate, 0)}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--glass-border)', paddingTop: '8px', marginTop: '8px', fontSize: '1rem' }}>
@@ -291,7 +291,7 @@ export default function QuotationCreatorPage() {
               </div>
             </div>
 
-            <div className="form-group" style={{ marginBottom: 0 }}>
+            <div className="form-group" style={{ marginBottom: '16px' }}>
               <label className="form-label">Quotation Notes</label>
               <textarea
                 placeholder="Include delivery instructions, fitting details, or custom hardware additions..."
@@ -300,6 +300,32 @@ export default function QuotationCreatorPage() {
                 value={draft.notes}
                 onChange={(e) => updateDraftInfo({ notes: e.target.value })}
               />
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }}>
+              <h4 style={{ fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Custom Column Labels</h4>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Size/Sq.Ft. Label</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Size (Sq.Ft.) or Rft"
+                    className="form-input"
+                    value={draft.sizeHeading || ''}
+                    onChange={(e) => updateDraftInfo({ sizeHeading: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Qty/Unit Label</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Qty (Units) or Nos"
+                    className="form-input"
+                    value={draft.unitHeading || ''}
+                    onChange={(e) => updateDraftInfo({ unitHeading: e.target.value })}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

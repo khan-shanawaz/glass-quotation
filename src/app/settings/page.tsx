@@ -6,7 +6,7 @@ import { useQuotation, CompanyProfile } from '@/context/QuotationContext';
 export default function SettingsPage() {
   const { companyProfile, updateCompanyProfile, resetCompanyProfile } = useQuotation();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'terms'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'terms' | 'bank'>('profile');
 
   // Local state for configuration form fields
   const [companyName, setCompanyName] = useState('');
@@ -16,6 +16,7 @@ export default function SettingsPage() {
   const [taxRate, setTaxRate] = useState('18');
   const [logoBase64, setLogoBase64] = useState('');
   const [termsAndConditions, setTermsAndConditions] = useState('');
+  const [bankDetails, setBankDetails] = useState('');
 
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -29,6 +30,7 @@ export default function SettingsPage() {
       setTaxRate(String(companyProfile.taxRate));
       setLogoBase64(companyProfile.logoBase64 || '');
       setTermsAndConditions(companyProfile.termsAndConditions || '');
+      setBankDetails(companyProfile.bankDetails || '');
     }
   }, [companyProfile]);
 
@@ -71,6 +73,7 @@ export default function SettingsPage() {
       taxRate: cleanTaxRate,
       logoBase64,
       termsAndConditions: termsAndConditions.trim(),
+      bankDetails: bankDetails.trim(),
     };
 
     updateCompanyProfile(newProfile);
@@ -136,6 +139,23 @@ export default function SettingsPage() {
         >
           Terms & Conditions
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('bank')}
+          style={{
+            padding: '12px 24px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'bank' ? '2px solid var(--primary)' : '2px solid transparent',
+            color: activeTab === 'bank' ? 'var(--primary)' : 'var(--text-primary)',
+            fontWeight: 700,
+            cursor: 'pointer',
+            fontSize: '1rem',
+            transition: 'all var(--transition-fast)'
+          }}
+        >
+          Bank Details
+        </button>
       </div>
 
       {saveSuccess && (
@@ -147,7 +167,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {activeTab === 'profile' ? (
+      {activeTab === 'profile' && (
         <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px', alignItems: 'start' }}>
           
           {/* Left Card: Company Profile Inputs */}
@@ -305,7 +325,9 @@ export default function SettingsPage() {
             </p>
           </div>
         </form>
-      ) : (
+      )}
+
+      {activeTab === 'terms' && (
         <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px', alignItems: 'start' }}>
           {/* Left Card: Terms & Conditions Input */}
           <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -347,6 +369,55 @@ export default function SettingsPage() {
                 <li><strong>Breakage:</strong> Clearly state that glass is fragile and not covered once successfully delivered.</li>
                 <li><strong>Timeframe:</strong> Toughening can take up to 7-12 working days.</li>
                 <li><strong>Loading/Transport:</strong> Standard transport and crane lifters are charged extra.</li>
+              </ul>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {activeTab === 'bank' && (
+        <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px', alignItems: 'start' }}>
+          {/* Left Card: Bank Details Input */}
+          <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px', color: 'var(--primary)' }}>
+              Company Bank Account Details
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Specify your company's bank account details to display on quotations for receiving client payments.
+            </p>
+
+            <div className="form-group">
+              <label className="form-label">Bank Details</label>
+              <textarea
+                placeholder="Bank Name: ...&#10;Account Holder: ...&#10;Account Number: ...&#10;IFSC Code: ...&#10;Branch Name: ..."
+                className="form-input"
+                style={{ resize: 'vertical', minHeight: '220px', fontFamily: 'var(--font-sans)', fontSize: '0.9rem', lineHeight: '1.6' }}
+                value={bankDetails}
+                onChange={(e) => setBankDetails(e.target.value)}
+                required
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--glass-border)', paddingTop: '16px', marginTop: '12px' }}>
+              <button type="submit" className="btn btn-primary" style={{ padding: '12px 32px' }}>
+                Save Bank Details
+              </button>
+            </div>
+          </div>
+
+          {/* Right Card: Payment Tips */}
+          <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px', color: 'var(--warning)' }}>
+              Payment Information Tips
+            </h3>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <p>To avoid delay in payment processing, ensure the following fields are clearly listed:</p>
+              <ul style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <li><strong>Beneficiary Name:</strong> Your registered legal company name.</li>
+                <li><strong>Bank Name & Branch:</strong> Detailed location of the branch.</li>
+                <li><strong>Account Number:</strong> Double-check for accuracy.</li>
+                <li><strong>IFSC Code:</strong> Required for domestic bank transfers.</li>
+                <li><strong>SWIFT/BIC Code:</strong> Include if you accept international payments.</li>
               </ul>
             </div>
           </div>

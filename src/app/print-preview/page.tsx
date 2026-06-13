@@ -26,6 +26,7 @@ function PrintPreviewContent() {
   const [localCompanyPhone, setLocalCompanyPhone] = useState<string>('');
   const [localCompanyEmail, setLocalCompanyEmail] = useState<string>('');
   const [localTerms, setLocalTerms] = useState<string>('');
+  const [localBankDetails, setLocalBankDetails] = useState<string>('');
 
   // Synchronize local states when the selected quotation or company profile changes
   useEffect(() => {
@@ -39,14 +40,14 @@ function PrintPreviewContent() {
     if (!found && savedQuotations.length > 0) {
       found = savedQuotations[0];
     }
-
+ 
     if (found) {
       // Deep copy to allow offline edit sessions without corrupting original state until saved
       setLocalQuote(JSON.parse(JSON.stringify(found)));
       setSelectedQuoteId(found.id);
     }
   }, [searchParams, savedQuotations]);
-
+ 
   useEffect(() => {
     if (companyProfile) {
       setLocalCompanyName(companyProfile.companyName);
@@ -54,6 +55,7 @@ function PrintPreviewContent() {
       setLocalCompanyPhone(companyProfile.companyPhone);
       setLocalCompanyEmail(companyProfile.companyEmail);
       setLocalTerms(companyProfile.termsAndConditions);
+      setLocalBankDetails(companyProfile.bankDetails || '');
     }
   }, [companyProfile]);
 
@@ -393,13 +395,12 @@ function PrintPreviewContent() {
               </div>
               <div className="invoice-muted-border" style={{ paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', display: 'block' }}>
-                  Reference Notes:
+                  Bank Details:
                 </span>
                 <div className="no-print">
                   <textarea
                     className="table-inline-input"
                     style={{ 
-                      fontStyle: 'italic', 
                       fontSize: '0.85rem', 
                       lineHeight: '1.4', 
                       padding: '4px', 
@@ -409,13 +410,13 @@ function PrintPreviewContent() {
                       borderBottom: '1px dashed var(--glass-border)',
                       background: 'transparent'
                     }}
-                    value={localQuote.notes}
-                    onChange={(e) => triggerRecalculation({ notes: e.target.value })}
-                    placeholder="Type notes here..."
+                    value={localBankDetails}
+                    onChange={(e) => setLocalBankDetails(e.target.value)}
+                    placeholder="Bank details..."
                   />
                 </div>
-                <p className="print-only" style={{ fontStyle: 'italic', fontSize: '0.85rem', lineHeight: '1.4' }}>
-                  {localQuote.notes || 'No custom processing guidelines specified.'}
+                <p className="print-only" style={{ fontSize: '0.85rem', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
+                  {localBankDetails || 'Bank details not configured.'}
                 </p>
               </div>
             </div>
@@ -427,9 +428,9 @@ function PrintPreviewContent() {
                   <tr className="invoice-table-header">
                     <th style={{ padding: paddingSize, fontWeight: 600 }}>Description</th>
                     <th style={{ padding: paddingSize, fontWeight: 600 }}>Category</th>
-                    <th style={{ padding: paddingSize, fontWeight: 600, textAlign: 'right' }}>Size (Sq.Ft.)</th>
-                    <th style={{ padding: paddingSize, fontWeight: 600, textAlign: 'right' }}>Qty</th>
-                    <th style={{ padding: paddingSize, fontWeight: 600, textAlign: 'right' }}>Rate / Sq.Ft.</th>
+                    <th style={{ padding: paddingSize, fontWeight: 600, textAlign: 'right' }}>{localQuote.sizeHeading || 'Size (Sq.Ft.)'}</th>
+                    <th style={{ padding: paddingSize, fontWeight: 600, textAlign: 'right' }}>{localQuote.unitHeading || 'Qty'}</th>
+                    <th style={{ padding: paddingSize, fontWeight: 600, textAlign: 'right' }}>Rate / {localQuote.sizeHeading || 'Sq.Ft.'}</th>
                     <th style={{ padding: paddingSize, fontWeight: 600, textAlign: 'right' }}>Final Amount</th>
                     <th className="no-print" style={{ padding: paddingSize, fontWeight: 600, textAlign: 'center', width: '60px' }}>Action</th>
                   </tr>
@@ -602,9 +603,45 @@ function PrintPreviewContent() {
               </button>
             </div>
 
-            {/* Totals cards box */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
-              <div className="invoice-totals-box" style={{ width: '330px', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.9rem', padding: forceSinglePage ? '10px' : '16px' }}>
+            {/* Side-by-Side: Terms & Conditions and Totals */}
+            <div 
+              className="invoice-footer-grid" 
+              style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1.2fr 1fr', 
+                gap: forceSinglePage ? '16px' : '24px', 
+                marginTop: '16px', 
+                alignItems: 'start' 
+              }}
+            >
+              {/* Terms and Conditions (Editable WYSIWYG) */}
+              <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '12px' }} className="invoice-terms-section">
+                <h4 className="invoice-title-color" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '6px' }}>Terms & Conditions:</h4>
+                <div className="no-print">
+                  <textarea
+                    className="table-inline-input"
+                    style={{ 
+                      fontSize: '0.7rem', 
+                      lineHeight: '1.4', 
+                      width: '100%', 
+                      minHeight: '80px', 
+                      resize: 'vertical',
+                      borderBottom: '1px dashed var(--glass-border)',
+                      background: 'transparent',
+                      whiteSpace: 'pre-line'
+                    }}
+                    value={localTerms}
+                    onChange={(e) => setLocalTerms(e.target.value)}
+                    placeholder="Terms and Conditions..."
+                  />
+                </div>
+                <div className="invoice-terms-text" style={{ fontSize: '0.7rem', lineHeight: '1.4', whiteSpace: 'pre-line' }}>
+                  <div className="print-only">{localTerms}</div>
+                </div>
+              </div>
+
+              {/* Totals cards box */}
+              <div className="invoice-totals-box" style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', padding: '12px', borderRadius: '4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Items Subtotal:</span>
                   <span style={{ fontWeight: 600 }}>{formatCustomCurrency(localQuote.summary.subtotal, quoteCurrency)}</span>
@@ -615,19 +652,19 @@ function PrintPreviewContent() {
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                   className={localQuote.summary.discountAmount > 0 ? "" : "no-print"}
                 >
-                  <span style={{ color: localQuote.summary.discountAmount > 0 ? '#e11d48' : 'inherit' }}>Discount Deducted:</span>
+                  <span style={{ color: localQuote.summary.discountAmount > 0 ? '#e11d48' : 'inherit' }}>Discount:</span>
                   <div className="no-print" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                     <input
                       type="number"
                       className="table-inline-input font-mono"
-                      style={{ width: '60px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)' }}
+                      style={{ width: '45px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)', fontSize: '0.75rem' }}
                       value={localQuote.discount || ''}
                       onChange={(e) => triggerRecalculation({ discount: safeNumber(e.target.value, 0) })}
                       placeholder="0"
                     />
                     <select
                       className="table-inline-input"
-                      style={{ padding: '2px', fontSize: '0.8rem', borderBottom: '1px dashed var(--glass-border)', cursor: 'pointer' }}
+                      style={{ padding: '2px', fontSize: '0.75rem', borderBottom: '1px dashed var(--glass-border)', cursor: 'pointer' }}
                       value={localQuote.isDiscountFlat ? 'flat' : 'percent'}
                       onChange={(e) => triggerRecalculation({ isDiscountFlat: e.target.value === 'flat' })}
                     >
@@ -645,13 +682,13 @@ function PrintPreviewContent() {
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                   className={localQuote.summary.transportCharges > 0 ? "" : "no-print"}
                 >
-                  <span>Transport Charges:</span>
+                  <span>Transport:</span>
                   <div className="no-print" style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                    <span style={{ fontSize: '0.85rem' }}>{quoteCurrency}</span>
+                    <span style={{ fontSize: '0.75rem' }}>{quoteCurrency}</span>
                     <input
                       type="number"
                       className="table-inline-input font-mono"
-                      style={{ width: '80px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)' }}
+                      style={{ width: '60px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)', fontSize: '0.75rem' }}
                       value={localQuote.transportCharges || ''}
                       onChange={(e) => triggerRecalculation({ transportCharges: safeNumber(e.target.value, 0) })}
                       placeholder="0"
@@ -667,13 +704,13 @@ function PrintPreviewContent() {
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                   className={localQuote.summary.labourCharges > 0 ? "" : "no-print"}
                 >
-                  <span>Labour/Installation:</span>
+                  <span>Labour/Fitting:</span>
                   <div className="no-print" style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                    <span style={{ fontSize: '0.85rem' }}>{quoteCurrency}</span>
+                    <span style={{ fontSize: '0.75rem' }}>{quoteCurrency}</span>
                     <input
                       type="number"
                       className="table-inline-input font-mono"
-                      style={{ width: '80px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)' }}
+                      style={{ width: '60px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)', fontSize: '0.75rem' }}
                       value={localQuote.labourCharges || ''}
                       onChange={(e) => triggerRecalculation({ labourCharges: safeNumber(e.target.value, 0) })}
                       placeholder="0"
@@ -693,50 +730,24 @@ function PrintPreviewContent() {
                     <input
                       type="checkbox"
                       id="list-tax-checkbox"
-                      style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                      style={{ width: '12px', height: '12px', cursor: 'pointer', accentColor: 'var(--primary)' }}
                       checked={localQuote.isTaxEnabled !== false}
                       onChange={(e) => triggerRecalculation({ isTaxEnabled: e.target.checked })}
                     />
-                    <label htmlFor="list-tax-checkbox" style={{ cursor: 'pointer', userSelect: 'none', fontSize: '0.9rem' }}>
-                      GST / VAT ({localQuote.summary.taxRate}%):
+                    <label htmlFor="list-tax-checkbox" style={{ cursor: 'pointer', userSelect: 'none', fontSize: '0.8rem' }}>
+                      GST ({localQuote.summary.taxRate}%):
                     </label>
                   </div>
                   <span className="print-only">
-                    GST / VAT ({localQuote.summary.taxRate}%):
+                    GST ({localQuote.summary.taxRate}%):
                   </span>
                   <span style={{ fontWeight: 600 }}>{formatCustomCurrency(localQuote.summary.taxAmount, quoteCurrency)}</span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '6px', fontSize: '1.25rem' }}>
-                  <span style={{ fontWeight: 700 }}>Grand Total:</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', fontSize: '1.05rem' }}>
+                  <span style={{ fontWeight: 700 }}>Total:</span>
                   <span className="invoice-grand-total" style={{ fontWeight: 800 }}>{formatCustomCurrency(localQuote.summary.grandTotal, quoteCurrency)}</span>
                 </div>
-              </div>
-            </div>
-
-            {/* Terms and Conditions (Editable WYSIWYG) */}
-            <div style={{ marginTop: forceSinglePage ? '16px' : '32px', borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }} className="invoice-terms-section">
-              <h4 className="invoice-title-color" style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>Terms & Conditions:</h4>
-              <div className="no-print">
-                <textarea
-                  className="table-inline-input"
-                  style={{ 
-                    fontSize: '0.75rem', 
-                    lineHeight: '1.6', 
-                    width: '100%', 
-                    minHeight: '80px', 
-                    resize: 'vertical',
-                    borderBottom: '1px dashed var(--glass-border)',
-                    background: 'transparent',
-                    whiteSpace: 'pre-line'
-                  }}
-                  value={localTerms}
-                  onChange={(e) => setLocalTerms(e.target.value)}
-                  placeholder="Terms and Conditions..."
-                />
-              </div>
-              <div className="print-only invoice-terms-text" style={{ fontSize: '0.75rem', lineHeight: '1.6', whiteSpace: 'pre-line' }}>
-                {localTerms}
               </div>
             </div>
 
@@ -834,7 +845,7 @@ function PrintPreviewContent() {
             display: block !important;
             width: 100% !important;
           }
-          body, .main-content {
+          html, body, .main-content {
             background: #ffffff !important;
             color: #0f172a !important;
             padding: 0 !important;
@@ -924,8 +935,17 @@ function PrintPreviewContent() {
           }
           .invoice-terms-section {
             border-top: 1.5px solid #bfdbfe !important;
-            margin-top: ${forceSinglePage ? '10px' : '24px'} !important;
-            padding-top: ${forceSinglePage ? '6px' : '12px'} !important;
+            margin-top: ${forceSinglePage ? '8px' : '16px'} !important;
+            padding-top: ${forceSinglePage ? '4px' : '8px'} !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          .invoice-footer-grid {
+            display: grid !important;
+            grid-template-columns: 1.2fr 1fr !important;
+            gap: 16px !important;
+            width: 100% !important;
+            margin-top: 16px !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }

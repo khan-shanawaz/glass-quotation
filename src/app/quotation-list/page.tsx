@@ -9,7 +9,7 @@ import { exportToCSV, parseCSV } from '@/utils/csvHelper';
 function QuotationListContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { savedQuotations, deleteQuotation, convertQuoteToProject, companyProfile, importQuotations, updateQuotation, categories } = useQuotation();
+  const { savedQuotations, deleteQuotation, convertQuoteToProject, companyProfile, importQuotations, updateQuotation, categories, updateCompanyProfile } = useQuotation();
   
   const [selectedQuote, setSelectedQuote] = useState<SavedQuotation | null>(null);
 
@@ -479,13 +479,12 @@ function QuotationListContent() {
                   </div>
                   <div className="invoice-muted-border" style={{ paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', display: 'block' }}>
-                      Reference Notes:
+                      Bank Details:
                     </span>
                     <div className="no-print">
                       <textarea
                         className="table-inline-input"
                         style={{ 
-                          fontStyle: 'italic', 
                           fontSize: '0.85rem', 
                           lineHeight: '1.4', 
                           padding: '4px', 
@@ -495,13 +494,13 @@ function QuotationListContent() {
                           borderBottom: '1px dashed var(--glass-border)',
                           background: 'transparent'
                         }}
-                        value={selectedQuote.notes}
-                        onChange={(e) => updateQuotation(selectedQuote.id, { notes: e.target.value })}
-                        placeholder="No custom processing guidelines specified. Type here to add..."
+                        value={companyProfile.bankDetails || ''}
+                        onChange={(e) => updateCompanyProfile({ ...companyProfile, bankDetails: e.target.value })}
+                        placeholder="Configure bank details in Settings..."
                       />
                     </div>
-                    <p className="print-only" style={{ fontStyle: 'italic', fontSize: '0.85rem', lineHeight: '1.4' }}>
-                      {selectedQuote.notes || 'No custom processing guidelines specified.'}
+                    <p className="print-only" style={{ fontSize: '0.85rem', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
+                      {companyProfile.bankDetails || 'Bank details not configured.'}
                     </p>
                   </div>
                 </div>
@@ -513,9 +512,9 @@ function QuotationListContent() {
                       <tr className="invoice-table-header">
                         <th style={{ padding: '8px', fontWeight: 600 }}>Description</th>
                         <th style={{ padding: '8px', fontWeight: 600 }}>Category</th>
-                        <th style={{ padding: '8px', fontWeight: 600, textAlign: 'right' }}>Size (Sq.Ft.)</th>
-                        <th style={{ padding: '8px', fontWeight: 600, textAlign: 'right' }}>Qty</th>
-                        <th style={{ padding: '8px', fontWeight: 600, textAlign: 'right' }}>Rate / Sq.Ft.</th>
+                        <th style={{ padding: '8px', fontWeight: 600, textAlign: 'right' }}>{selectedQuote.sizeHeading || 'Size (Sq.Ft.)'}</th>
+                        <th style={{ padding: '8px', fontWeight: 600, textAlign: 'right' }}>{selectedQuote.unitHeading || 'Qty'}</th>
+                        <th style={{ padding: '8px', fontWeight: 600, textAlign: 'right' }}>Rate / {selectedQuote.sizeHeading || 'Sq.Ft.'}</th>
                         <th style={{ padding: '8px', fontWeight: 600, textAlign: 'right' }}>Final Amount</th>
                         <th className="no-print" style={{ padding: '8px', fontWeight: 600, textAlign: 'center', width: '60px' }}>Action</th>
                       </tr>
@@ -688,129 +687,139 @@ function QuotationListContent() {
                   </button>
                 </div>
 
-                {/* Totals & Tax Invoicing Summaries */}
+                {/* Side-by-Side: Terms & Conditions and Totals */}
+                <div 
+                  className="invoice-footer-grid" 
+                  style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '1.2fr 1fr', 
+                    gap: '24px', 
+                    marginTop: '16px', 
+                    alignItems: 'start' 
+                  }}
+                >
+                  {/* Terms & Conditions Section */}
+                  <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '12px' }} className="invoice-terms-section">
+                    <h4 className="invoice-title-color" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '6px' }}>Terms & Conditions:</h4>
+                    <div style={{ fontSize: '0.7rem', lineHeight: '1.4', whiteSpace: 'pre-line' }} className="invoice-terms-text">
+                      {companyProfile.termsAndConditions || '1. Price is ex-factory. Transportation and installation/labour charges are extra.\n2. 50% advance along with order purchase, balance 50% before delivery.\n3. Goods once sold will not be taken back or exchanged.\n4. Glass breakage after delivery is not our responsibility.\n5. Any disputes are subject to local jurisdiction only.'}
+                    </div>
+                  </div>
+
+                  {/* Totals & Tax Invoicing Summaries */}
                   {(() => {
                     const quoteCurrency = selectedQuote.items[0]?.currencySymbol || '₹';
                     return (
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
-                        <div className="invoice-totals-box" style={{ width: '330px', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.9rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span>Items Subtotal:</span>
-                            <span style={{ fontWeight: 600 }}>{formatCustomCurrency(selectedQuote.summary.subtotal, quoteCurrency)}</span>
+                      <div className="invoice-totals-box" style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', padding: '12px', borderRadius: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>Items Subtotal:</span>
+                          <span style={{ fontWeight: 600 }}>{formatCustomCurrency(selectedQuote.summary.subtotal, quoteCurrency)}</span>
+                        </div>
+                        
+                        {/* Discount */}
+                        <div 
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                          className={selectedQuote.summary.discountAmount > 0 ? "" : "no-print"}
+                        >
+                          <span style={{ color: selectedQuote.summary.discountAmount > 0 ? '#e11d48' : 'inherit' }}>Discount:</span>
+                          <div className="no-print" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                            <input
+                              type="number"
+                              className="table-inline-input font-mono"
+                              style={{ width: '45px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)', fontSize: '0.75rem' }}
+                              value={selectedQuote.discount || ''}
+                              onChange={(e) => updateQuotation(selectedQuote.id, { discount: safeNumber(e.target.value, 0) })}
+                              placeholder="0"
+                            />
+                            <select
+                              className="table-inline-input"
+                              style={{ padding: '2px', fontSize: '0.75rem', borderBottom: '1px dashed var(--glass-border)', cursor: 'pointer' }}
+                              value={selectedQuote.isDiscountFlat ? 'flat' : 'percent'}
+                              onChange={(e) => updateQuotation(selectedQuote.id, { isDiscountFlat: e.target.value === 'flat' })}
+                            >
+                              <option value="percent" style={{ background: '#0e1420' }}>%</option>
+                              <option value="flat" style={{ background: '#0e1420' }}>{quoteCurrency}</option>
+                            </select>
                           </div>
-                          
-                          {/* Discount: Editable in screen view, printed only if > 0 */}
-                          <div 
-                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                            className={selectedQuote.summary.discountAmount > 0 ? "" : "no-print"}
-                          >
-                            <span style={{ color: selectedQuote.summary.discountAmount > 0 ? '#e11d48' : 'inherit' }}>Discount Deducted:</span>
-                            <div className="no-print" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                              <input
-                                type="number"
-                                className="table-inline-input font-mono"
-                                style={{ width: '60px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)' }}
-                                value={selectedQuote.discount || ''}
-                                onChange={(e) => updateQuotation(selectedQuote.id, { discount: safeNumber(e.target.value, 0) })}
-                                placeholder="0"
-                              />
-                              <select
-                                className="table-inline-input"
-                                style={{ padding: '2px', fontSize: '0.8rem', borderBottom: '1px dashed var(--glass-border)', cursor: 'pointer' }}
-                                value={selectedQuote.isDiscountFlat ? 'flat' : 'percent'}
-                                onChange={(e) => updateQuotation(selectedQuote.id, { isDiscountFlat: e.target.value === 'flat' })}
-                              >
-                                <option value="percent" style={{ background: '#0e1420' }}>%</option>
-                                <option value="flat" style={{ background: '#0e1420' }}>{quoteCurrency}</option>
-                              </select>
-                            </div>
-                            <span className="print-only" style={{ fontWeight: 600, color: '#e11d48' }}>
-                              -{formatCustomCurrency(selectedQuote.summary.discountAmount, quoteCurrency)}
-                            </span>
-                          </div>
+                          <span className="print-only" style={{ fontWeight: 600, color: '#e11d48' }}>
+                            -{formatCustomCurrency(selectedQuote.summary.discountAmount, quoteCurrency)}
+                          </span>
+                        </div>
 
-                          {/* Transport: Editable in screen view, printed only if > 0 */}
-                          <div 
-                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                            className={selectedQuote.summary.transportCharges > 0 ? "" : "no-print"}
-                          >
-                            <span>Transport Charges:</span>
-                            <div className="no-print" style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                              <span style={{ fontSize: '0.85rem' }}>{quoteCurrency}</span>
-                              <input
-                                type="number"
-                                className="table-inline-input font-mono"
-                                style={{ width: '80px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)' }}
-                                value={selectedQuote.transportCharges || ''}
-                                onChange={(e) => updateQuotation(selectedQuote.id, { transportCharges: safeNumber(e.target.value, 0) })}
-                                placeholder="0"
-                              />
-                            </div>
-                            <span className="print-only" style={{ fontWeight: 600 }}>
-                              {formatCustomCurrency(selectedQuote.summary.transportCharges, quoteCurrency)}
-                            </span>
+                        {/* Transport */}
+                        <div 
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                          className={selectedQuote.summary.transportCharges > 0 ? "" : "no-print"}
+                        >
+                          <span>Transport:</span>
+                          <div className="no-print" style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                            <span style={{ fontSize: '0.75rem' }}>{quoteCurrency}</span>
+                            <input
+                              type="number"
+                              className="table-inline-input font-mono"
+                              style={{ width: '60px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)', fontSize: '0.75rem' }}
+                              value={selectedQuote.transportCharges || ''}
+                              onChange={(e) => updateQuotation(selectedQuote.id, { transportCharges: safeNumber(e.target.value, 0) })}
+                              placeholder="0"
+                            />
                           </div>
+                          <span className="print-only" style={{ fontWeight: 600 }}>
+                            {formatCustomCurrency(selectedQuote.summary.transportCharges, quoteCurrency)}
+                          </span>
+                        </div>
 
-                          {/* Labour: Editable in screen view, printed only if > 0 */}
-                          <div 
-                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                            className={selectedQuote.summary.labourCharges > 0 ? "" : "no-print"}
-                          >
-                            <span>Labour/Installation:</span>
-                            <div className="no-print" style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                              <span style={{ fontSize: '0.85rem' }}>{quoteCurrency}</span>
-                              <input
-                                type="number"
-                                className="table-inline-input font-mono"
-                                style={{ width: '80px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)' }}
-                                value={selectedQuote.labourCharges || ''}
-                                onChange={(e) => updateQuotation(selectedQuote.id, { labourCharges: safeNumber(e.target.value, 0) })}
-                                placeholder="0"
-                              />
-                            </div>
-                            <span className="print-only" style={{ fontWeight: 600 }}>
-                              {formatCustomCurrency(selectedQuote.summary.labourCharges, quoteCurrency)}
-                            </span>
+                        {/* Labour */}
+                        <div 
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                          className={selectedQuote.summary.labourCharges > 0 ? "" : "no-print"}
+                        >
+                          <span>Labour/Fitting:</span>
+                          <div className="no-print" style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                            <span style={{ fontSize: '0.75rem' }}>{quoteCurrency}</span>
+                            <input
+                              type="number"
+                              className="table-inline-input font-mono"
+                              style={{ width: '60px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)', fontSize: '0.75rem' }}
+                              value={selectedQuote.labourCharges || ''}
+                              onChange={(e) => updateQuotation(selectedQuote.id, { labourCharges: safeNumber(e.target.value, 0) })}
+                              placeholder="0"
+                            />
                           </div>
+                          <span className="print-only" style={{ fontWeight: 600 }}>
+                            {formatCustomCurrency(selectedQuote.summary.labourCharges, quoteCurrency)}
+                          </span>
+                        </div>
 
-                          {/* Tax GST: Checkbox toggle in screen view, printed as static text */}
-                          <div 
-                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} 
-                            className="invoice-totals-divider"
-                          >
-                            <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <input
-                                type="checkbox"
-                                id="list-tax-checkbox"
-                                style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: 'var(--primary)' }}
-                                checked={selectedQuote.isTaxEnabled !== false}
-                                onChange={(e) => updateQuotation(selectedQuote.id, { isTaxEnabled: e.target.checked })}
-                              />
-                              <label htmlFor="list-tax-checkbox" style={{ cursor: 'pointer', userSelect: 'none', fontSize: '0.9rem' }}>
-                                GST / VAT ({selectedQuote.summary.taxRate}%):
-                              </label>
-                            </div>
-                            <span className="print-only">
-                              GST / VAT ({selectedQuote.summary.taxRate}%):
-                            </span>
-                            <span style={{ fontWeight: 600 }}>{formatCustomCurrency(selectedQuote.summary.taxAmount, quoteCurrency)}</span>
+                        {/* GST */}
+                        <div 
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} 
+                          className="invoice-totals-divider"
+                        >
+                          <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              id="list-tax-checkbox"
+                              style={{ width: '12px', height: '12px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                              checked={selectedQuote.isTaxEnabled !== false}
+                              onChange={(e) => updateQuotation(selectedQuote.id, { isTaxEnabled: e.target.checked })}
+                            />
+                            <label htmlFor="list-tax-checkbox" style={{ cursor: 'pointer', userSelect: 'none', fontSize: '0.8rem' }}>
+                              GST ({selectedQuote.summary.taxRate}%):
+                            </label>
                           </div>
+                          <span className="print-only">
+                            GST ({selectedQuote.summary.taxRate}%):
+                          </span>
+                          <span style={{ fontWeight: 600 }}>{formatCustomCurrency(selectedQuote.summary.taxAmount, quoteCurrency)}</span>
+                        </div>
 
-                          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '6px', fontSize: '1.25rem' }}>
-                            <span style={{ fontWeight: 700 }}>Grand Total:</span>
-                            <span className="invoice-grand-total" style={{ fontWeight: 800 }}>{formatCustomCurrency(selectedQuote.summary.grandTotal, quoteCurrency)}</span>
-                          </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', fontSize: '1.05rem' }}>
+                          <span style={{ fontWeight: 700 }}>Total:</span>
+                          <span className="invoice-grand-total" style={{ fontWeight: 800 }}>{formatCustomCurrency(selectedQuote.summary.grandTotal, quoteCurrency)}</span>
                         </div>
                       </div>
                     );
                   })()}
-                
-                {/* Terms & Conditions Section */}
-                <div style={{ marginTop: '32px', borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }} className="invoice-terms-section">
-                  <h4 className="invoice-title-color" style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>Terms & Conditions:</h4>
-                  <div style={{ fontSize: '0.75rem', lineHeight: '1.6', whiteSpace: 'pre-line' }} className="invoice-terms-text">
-                    {companyProfile.termsAndConditions || '1. Price is ex-factory. Transportation and installation/labour charges are extra.\n2. 50% advance along with order purchase, balance 50% before delivery.\n3. Goods once sold will not be taken back or exchanged.\n4. Glass breakage after delivery is not our responsibility.\n5. Any disputes are subject to local jurisdiction only.'}
-                  </div>
                 </div>
 
                 {/* Footer Signature Lines */}
@@ -908,7 +917,7 @@ function QuotationListContent() {
             display: block !important;
             width: 100% !important;
           }
-          body, .main-content {
+          html, body, .main-content {
             background: #ffffff !important;
             color: #0f172a !important;
             padding: 0 !important;
@@ -1007,6 +1016,17 @@ function QuotationListContent() {
           }
           .invoice-terms-section {
             border-top: 1.5px solid #bfdbfe !important;
+            margin-top: 8px !important;
+            padding-top: 4px !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          .invoice-footer-grid {
+            display: grid !important;
+            grid-template-columns: 1.2fr 1fr !important;
+            gap: 16px !important;
+            width: 100% !important;
+            margin-top: 16px !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
