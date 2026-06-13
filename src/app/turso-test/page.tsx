@@ -1,5 +1,7 @@
 import { turso } from '@/utils/turso'
 
+export const dynamic = 'force-dynamic';
+
 export default async function TursoTestPage() {
   let errorMsg = null
   let tables: any[] = []

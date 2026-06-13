@@ -337,10 +337,73 @@ function PrintPreviewContent() {
                   </div>
                 </div>
               </div>
-              <div style={{ textAlign: 'right', minWidth: '120px' }}>
-                <h2 className="invoice-title-color" style={{ fontSize: '1.3rem', fontWeight: 800 }}>QUOTATION</h2>
-                <p style={{ fontSize: '0.85rem', fontWeight: 700, marginTop: '4px' }}>{localQuote.quoteNumber}</p>
-                <p style={{ fontSize: '0.75rem', marginTop: '2px' }}>Date: {localQuote.date}</p>
+              <div style={{ textAlign: 'right', minWidth: '150px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                {/* Document Title */}
+                <div className="no-print" style={{ width: '100%' }}>
+                  <input
+                    type="text"
+                    className="table-inline-input"
+                    style={{ 
+                      fontSize: '1.3rem', 
+                      fontWeight: 800, 
+                      color: 'var(--primary)', 
+                      textAlign: 'right', 
+                      width: '100%', 
+                      textTransform: 'uppercase',
+                      borderBottom: '1px dashed var(--glass-border)',
+                      background: 'transparent'
+                    }}
+                    value={localQuote.documentTitle || 'QUOTATION'}
+                    onChange={(e) => triggerRecalculation({ documentTitle: e.target.value })}
+                    placeholder="QUOTATION"
+                  />
+                </div>
+                <h2 className="invoice-title-color print-only" style={{ fontSize: '1.3rem', fontWeight: 800 }}>
+                  {(localQuote.documentTitle || 'QUOTATION').toUpperCase()}
+                </h2>
+
+                {/* Serial/Quotation Code */}
+                <div className="no-print" style={{ width: '100%' }}>
+                  <input
+                    type="text"
+                    className="table-inline-input"
+                    style={{ 
+                      fontSize: '0.85rem', 
+                      fontWeight: 700, 
+                      textAlign: 'right', 
+                      width: '100%',
+                      borderBottom: '1px dashed var(--glass-border)',
+                      background: 'transparent'
+                    }}
+                    value={localQuote.quoteNumber}
+                    onChange={(e) => triggerRecalculation({ quoteNumber: e.target.value })}
+                    placeholder="Quotation Number"
+                  />
+                </div>
+                <p className="print-only" style={{ fontSize: '0.85rem', fontWeight: 700, marginTop: '4px' }}>
+                  {localQuote.quoteNumber}
+                </p>
+
+                {/* Date */}
+                <div className="no-print" style={{ width: '100%' }}>
+                  <input
+                    type="text"
+                    className="table-inline-input"
+                    style={{ 
+                      fontSize: '0.75rem', 
+                      textAlign: 'right', 
+                      width: '100%',
+                      borderBottom: '1px dashed var(--glass-border)',
+                      background: 'transparent'
+                    }}
+                    value={localQuote.date}
+                    onChange={(e) => triggerRecalculation({ date: e.target.value })}
+                    placeholder="Date"
+                  />
+                </div>
+                <p className="print-only" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
+                  Date: {localQuote.date}
+                </p>
               </div>
             </div>
 

@@ -40,6 +40,7 @@ export interface SavedQuotation {
   isConvertedToProject: boolean;
   sizeHeading?: string;
   unitHeading?: string;
+  documentTitle?: string;
 }
 
 export type ProjectStatus = 'planning' | 'production' | 'delivery' | 'installed' | 'completed';
