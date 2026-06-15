@@ -59,13 +59,14 @@ export async function GET() {
     // Format projects
     const projects = projectsResult.rows.map(row => ({
       id: String(row.id),
-      quoteId: String(row.quoteId),
-      quoteNumber: String(row.quoteNumber),
+      quoteId: String(row.quoteId || ''),
+      quoteNumber: String(row.quoteNumber || ''),
       customerName: String(row.customerName),
       customerPhone: String(row.customerPhone),
       amount: Number(row.amount || 0),
       status: String(row.status),
       dateCreated: String(row.dateCreated),
+      tasks: JSON.parse(String(row.tasks || '[]')),
     }));
 
     // Format customers
@@ -154,9 +155,9 @@ export async function POST(request: Request) {
       await turso.execute("DELETE FROM projects;");
       for (const p of projects) {
         await turso.execute({
-          sql: `INSERT INTO projects (id, quoteId, quoteNumber, customerName, customerPhone, amount, status, dateCreated)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-          args: [p.id, p.quoteId, p.quoteNumber, p.customerName, p.customerPhone, p.amount || 0, p.status, p.dateCreated]
+          sql: `INSERT INTO projects (id, quoteId, quoteNumber, customerName, customerPhone, amount, status, dateCreated, tasks)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          args: [p.id, p.quoteId || '', p.quoteNumber || '', p.customerName, p.customerPhone, p.amount || 0, p.status, p.dateCreated, JSON.stringify(p.tasks || [])]
         });
       }
     }

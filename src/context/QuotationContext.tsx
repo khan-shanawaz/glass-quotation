@@ -45,6 +45,14 @@ export interface SavedQuotation {
 
 export type ProjectStatus = 'planning' | 'production' | 'delivery' | 'installed' | 'completed';
 
+export interface ProjectTask {
+  id: string;
+  title: string;
+  description?: string;
+  status: ProjectStatus;
+  dateCreated: string;
+}
+
 export interface ProjectItem {
   id: string;
   quoteId: string;
@@ -54,6 +62,7 @@ export interface ProjectItem {
   amount: number;
   status: ProjectStatus;
   dateCreated: string;
+  tasks?: ProjectTask[];
 }
 
 export interface CustomerItem {
@@ -94,6 +103,10 @@ interface QuotationContextType {
   convertQuoteToProject: (quoteId: string) => void;
   updateProjectStatus: (projectId: string, status: ProjectStatus) => void;
   deleteProject: (projectId: string) => void;
+  addProject: (customerName: string, customerPhone: string, amount: number, status: ProjectStatus) => void;
+  addProjectTask: (projectId: string, taskTitle: string, status: ProjectStatus) => void;
+  updateProjectTaskStatus: (projectId: string, taskId: string, newStatus: ProjectStatus) => void;
+  deleteProjectTask: (projectId: string, taskId: string) => void;
   categories: string[];
   addCategory: (name: string) => void;
   removeCategory: (name: string) => void;
@@ -362,7 +375,7 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         (c) => c.phone.trim() === phoneKey && phoneKey !== 'N/A'
       );
       
-      let updatedCustomersList = [...prevCustomers];
+      const updatedCustomersList = [...prevCustomers];
       
       if (existsIndex >= 0) {
         // Update existing client stats
@@ -467,6 +480,7 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         month: 'short',
         day: 'numeric'
       }),
+      tasks: [],
     };
 
     const updatedProjectsList = [newProjItem, ...projects];
@@ -529,6 +543,90 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setProjects(updated);
     saveLocalProjects(updated);
     triggerDBSync(companyProfile, updatedQuotes, updated, customers, categories);
+  };
+
+  const addProject = (customerName: string, customerPhone: string, amount: number, status: ProjectStatus) => {
+    const newProject: ProjectItem = {
+      id: Math.random().toString(36).substring(7),
+      quoteId: '',
+      quoteNumber: 'GQ-MANUAL-' + Math.floor(1000 + Math.random() * 9000),
+      customerName,
+      customerPhone: customerPhone || 'N/A',
+      amount: amount || 0,
+      status,
+      dateCreated: new Date().toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      }),
+      tasks: [],
+    };
+    setProjects((prev) => {
+      const updated = [newProject, ...prev];
+      saveLocalProjects(updated);
+      triggerDBSync(companyProfile, savedQuotations, updated, customers, categories);
+      return updated;
+    });
+  };
+
+  const addProjectTask = (projectId: string, taskTitle: string, status: ProjectStatus) => {
+    const newTask: ProjectTask = {
+      id: Math.random().toString(36).substring(7),
+      title: taskTitle,
+      status,
+      dateCreated: new Date().toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      }),
+    };
+    setProjects((prev) => {
+      const updated = prev.map((p) => {
+        if (p.id === projectId) {
+          const tasks = p.tasks || [];
+          return { ...p, tasks: [...tasks, newTask] };
+        }
+        return p;
+      });
+      saveLocalProjects(updated);
+      triggerDBSync(companyProfile, savedQuotations, updated, customers, categories);
+      return updated;
+    });
+  };
+
+  const updateProjectTaskStatus = (projectId: string, taskId: string, newStatus: ProjectStatus) => {
+    setProjects((prev) => {
+      const updated = prev.map((p) => {
+        if (p.id === projectId) {
+          const tasks = (p.tasks || []).map((t) => {
+            if (t.id === taskId) {
+              return { ...t, status: newStatus };
+            }
+            return t;
+          });
+          return { ...p, tasks };
+        }
+        return p;
+      });
+      saveLocalProjects(updated);
+      triggerDBSync(companyProfile, savedQuotations, updated, customers, categories);
+      return updated;
+    });
+  };
+
+  const deleteProjectTask = (projectId: string, taskId: string) => {
+    setProjects((prev) => {
+      const updated = prev.map((p) => {
+        if (p.id === projectId) {
+          const tasks = (p.tasks || []).filter((t) => t.id !== taskId);
+          return { ...p, tasks };
+        }
+        return p;
+      });
+      saveLocalProjects(updated);
+      triggerDBSync(companyProfile, savedQuotations, updated, customers, categories);
+      return updated;
+    });
   };
 
   const updateCompanyProfile = (newProfile: CompanyProfile) => {
@@ -625,6 +723,10 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         convertQuoteToProject,
         updateProjectStatus,
         deleteProject,
+        addProject,
+        addProjectTask,
+        updateProjectTaskStatus,
+        deleteProjectTask,
         updateCompanyProfile,
         resetCompanyProfile,
         importQuotations,
