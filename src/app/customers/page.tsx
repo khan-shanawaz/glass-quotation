@@ -1,12 +1,70 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuotation, CustomerItem } from '@/context/QuotationContext';
 import { formatRupee } from '@/utils/calculator';
 import { exportToCSV, parseCSV } from '@/utils/csvHelper';
 
 export default function CustomersListPage() {
-  const { customers, importCustomers } = useQuotation();
+  const { customers, importCustomers, addCustomer, updateCustomer, deleteCustomer } = useQuotation();
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
+
+  // Form states
+  const [formName, setFormName] = useState('');
+  const [formPhone, setFormPhone] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formOrdersAmount, setFormOrdersAmount] = useState('');
+  const [formQuotationsCount, setFormQuotationsCount] = useState('');
+
+  const openAddModal = () => {
+    setModalMode('add');
+    setEditingCustomerId(null);
+    setFormName('');
+    setFormPhone('');
+    setFormEmail('');
+    setFormOrdersAmount('0');
+    setFormQuotationsCount('0');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (c: CustomerItem) => {
+    setModalMode('edit');
+    setEditingCustomerId(c.id);
+    setFormName(c.name);
+    setFormPhone(c.phone);
+    setFormEmail(c.email);
+    setFormOrdersAmount(c.totalOrdersAmount.toString());
+    setFormQuotationsCount(c.totalQuotationsCount.toString());
+    setIsModalOpen(true);
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formName || !formPhone) {
+      alert('Please enter both name and mobile number.');
+      return;
+    }
+
+    const ordersAmount = parseFloat(formOrdersAmount) || 0;
+    const quotesCount = parseInt(formQuotationsCount, 10) || 0;
+
+    if (modalMode === 'add') {
+      addCustomer(formName, formPhone, formEmail, ordersAmount, quotesCount);
+    } else if (modalMode === 'edit' && editingCustomerId) {
+      updateCustomer(editingCustomerId, {
+        name: formName,
+        phone: formPhone,
+        email: formEmail,
+        totalOrdersAmount: ordersAmount,
+        totalQuotationsCount: quotesCount
+      });
+    }
+
+    setIsModalOpen(false);
+  };
 
   const totalCustomers = customers.length;
   
@@ -126,6 +184,16 @@ export default function CustomersListPage() {
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <button
+            onClick={openAddModal}
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Customer
+          </button>
+          <button
             onClick={handleExportCSV}
             className="btn btn-secondary"
             style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
@@ -200,6 +268,7 @@ export default function CustomersListPage() {
                   <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'center' }}>Quotes Generated</th>
                   <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'right' }}>Total Orders Value</th>
                   <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'right' }}>Last Activity</th>
+                  <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -223,6 +292,28 @@ export default function CustomersListPage() {
                     <td style={{ padding: '16px', textAlign: 'right', color: 'var(--text-muted)' }}>
                       {c.lastActive}
                     </td>
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(c)}
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px' }}
+                          title="Edit customer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteCustomer(c.id)}
+                          className="btn btn-danger"
+                          style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px' }}
+                          title="Delete customer"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -230,6 +321,82 @@ export default function CustomersListPage() {
           </div>
         )}
       </div>
+
+      {isModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ marginBottom: '24px', fontFamily: 'var(--font-header)' }}>
+              {modalMode === 'add' ? 'Add New Customer' : 'Edit Customer Details'}
+            </h2>
+            <form onSubmit={handleFormSubmit}>
+              <div className="form-group">
+                <label className="form-label">Customer Name *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder="Enter customer name"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Mobile Number *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formPhone}
+                  onChange={(e) => setFormPhone(e.target.value)}
+                  placeholder="Enter mobile number"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email Address</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={formEmail}
+                  onChange={(e) => setFormEmail(e.target.value)}
+                  placeholder="Enter email address"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Total Orders Amount (₹)</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={formOrdersAmount}
+                  onChange={(e) => setFormOrdersAmount(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Quotes Generated Count</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={formQuotationsCount}
+                  onChange={(e) => setFormQuotationsCount(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '32px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .table-row-hover:hover {

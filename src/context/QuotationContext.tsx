@@ -104,9 +104,13 @@ interface QuotationContextType {
   updateProjectStatus: (projectId: string, status: ProjectStatus) => void;
   deleteProject: (projectId: string) => void;
   addProject: (customerName: string, customerPhone: string, amount: number, status: ProjectStatus) => void;
+  updateProject: (projectId: string, fields: Partial<ProjectItem>) => void;
   addProjectTask: (projectId: string, taskTitle: string, status: ProjectStatus) => void;
   updateProjectTaskStatus: (projectId: string, taskId: string, newStatus: ProjectStatus) => void;
   deleteProjectTask: (projectId: string, taskId: string) => void;
+  addCustomer: (name: string, phone: string, email: string, totalOrdersAmount?: number, totalQuotationsCount?: number) => void;
+  updateCustomer: (customerId: string, fields: Partial<CustomerItem>) => void;
+  deleteCustomer: (customerId: string) => void;
   categories: string[];
   addCategory: (name: string) => void;
   removeCategory: (name: string) => void;
@@ -569,6 +573,65 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   };
 
+  const updateProject = (projectId: string, fields: Partial<ProjectItem>) => {
+    setProjects((prev) => {
+      const updated = prev.map((p) => {
+        if (p.id === projectId) {
+          return { ...p, ...fields };
+        }
+        return p;
+      });
+      saveLocalProjects(updated);
+      triggerDBSync(companyProfile, savedQuotations, updated, customers, categories);
+      return updated;
+    });
+  };
+
+  const addCustomer = (name: string, phone: string, email: string, totalOrdersAmount = 0, totalQuotationsCount = 0) => {
+    const newCustomer: CustomerItem = {
+      id: Math.random().toString(36).substring(7),
+      name,
+      phone: phone || 'N/A',
+      email: email || 'N/A',
+      totalOrdersAmount,
+      totalQuotationsCount,
+      lastActive: new Date().toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      }).split(',')[0],
+    };
+    setCustomers((prev) => {
+      const updated = [newCustomer, ...prev];
+      saveLocalCustomers(updated);
+      triggerDBSync(companyProfile, savedQuotations, projects, updated, categories);
+      return updated;
+    });
+  };
+
+  const updateCustomer = (customerId: string, fields: Partial<CustomerItem>) => {
+    setCustomers((prev) => {
+      const updated = prev.map((c) => {
+        if (c.id === customerId) {
+          return { ...c, ...fields };
+        }
+        return c;
+      });
+      saveLocalCustomers(updated);
+      triggerDBSync(companyProfile, savedQuotations, projects, updated, categories);
+      return updated;
+    });
+  };
+
+  const deleteCustomer = (customerId: string) => {
+    setCustomers((prev) => {
+      const updated = prev.filter((c) => c.id !== customerId);
+      saveLocalCustomers(updated);
+      triggerDBSync(companyProfile, savedQuotations, projects, updated, categories);
+      return updated;
+    });
+  };
+
   const addProjectTask = (projectId: string, taskTitle: string, status: ProjectStatus) => {
     const newTask: ProjectTask = {
       id: Math.random().toString(36).substring(7),
@@ -724,9 +787,13 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         updateProjectStatus,
         deleteProject,
         addProject,
+        updateProject,
         addProjectTask,
         updateProjectTaskStatus,
         deleteProjectTask,
+        addCustomer,
+        updateCustomer,
+        deleteCustomer,
         updateCompanyProfile,
         resetCompanyProfile,
         importQuotations,

@@ -1,13 +1,70 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuotation, ProjectStatus, ProjectItem } from '@/context/QuotationContext';
 import { formatRupee } from '@/utils/calculator';
 import { exportToCSV, parseCSV } from '@/utils/csvHelper';
 
 export default function ProjectsListPage() {
-  const { projects, updateProjectStatus, deleteProject, importProjects } = useQuotation();
+  const { projects, updateProjectStatus, deleteProject, importProjects, addProject, updateProject } = useQuotation();
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+
+  // Form states
+  const [formName, setFormName] = useState('');
+  const [formPhone, setFormPhone] = useState('');
+  const [formAmount, setFormAmount] = useState('');
+  const [formStatus, setFormStatus] = useState<ProjectStatus>('planning');
+  const [formQuoteNumber, setFormQuoteNumber] = useState('');
+
+  const openAddModal = () => {
+    setModalMode('add');
+    setEditingProjectId(null);
+    setFormName('');
+    setFormPhone('');
+    setFormAmount('');
+    setFormStatus('planning');
+    setFormQuoteNumber('');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (project: ProjectItem) => {
+    setModalMode('edit');
+    setEditingProjectId(project.id);
+    setFormName(project.customerName);
+    setFormPhone(project.customerPhone);
+    setFormAmount(project.amount.toString());
+    setFormStatus(project.status);
+    setFormQuoteNumber(project.quoteNumber);
+    setIsModalOpen(true);
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formName) {
+      alert('Please enter a customer name.');
+      return;
+    }
+
+    const amt = parseFloat(formAmount) || 0;
+
+    if (modalMode === 'add') {
+      addProject(formName, formPhone, amt, formStatus);
+    } else if (modalMode === 'edit' && editingProjectId) {
+      updateProject(editingProjectId, {
+        customerName: formName,
+        customerPhone: formPhone,
+        amount: amt,
+        status: formStatus,
+        quoteNumber: formQuoteNumber
+      });
+    }
+
+    setIsModalOpen(false);
+  };
 
   const totalActiveJobs = projects.filter((p) => p.status !== 'completed').length;
   const totalCompletedJobs = projects.filter((p) => p.status === 'completed').length;
@@ -144,6 +201,16 @@ export default function ProjectsListPage() {
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <button
+            onClick={openAddModal}
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Project
+          </button>
+          <button
             onClick={handleExportCSV}
             className="btn btn-secondary"
             style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
@@ -259,6 +326,15 @@ export default function ProjectsListPage() {
                           </select>
                           <button
                             type="button"
+                            onClick={() => openEditModal(project)}
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px' }}
+                            title="Edit project"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => deleteProject(project.id)}
                             className="btn btn-danger"
                             style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px' }}
@@ -276,6 +352,87 @@ export default function ProjectsListPage() {
           </div>
         )}
       </div>
+
+      {isModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ marginBottom: '24px', fontFamily: 'var(--font-header)' }}>
+              {modalMode === 'add' ? 'Add New Project' : 'Edit Project Details'}
+            </h2>
+            <form onSubmit={handleFormSubmit}>
+              {modalMode === 'edit' && (
+                <div className="form-group">
+                  <label className="form-label">Quote Number / Ref</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={formQuoteNumber}
+                    onChange={(e) => setFormQuoteNumber(e.target.value)}
+                    placeholder="e.g. GQ-2026-1234"
+                  />
+                </div>
+              )}
+              <div className="form-group">
+                <label className="form-label">Customer Name *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder="Enter customer name"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Mobile Number</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formPhone}
+                  onChange={(e) => setFormPhone(e.target.value)}
+                  placeholder="Enter mobile number"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Amount (₹)</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={formAmount}
+                  onChange={(e) => setFormAmount(e.target.value)}
+                  placeholder="Enter amount"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Workflow Status</label>
+                <select
+                  className="form-input form-select"
+                  value={formStatus}
+                  onChange={(e) => setFormStatus(e.target.value as ProjectStatus)}
+                >
+                  <option value="planning">Planning / Design</option>
+                  <option value="production">In Production</option>
+                  <option value="delivery">Ready for Delivery</option>
+                  <option value="installed">Installed</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '32px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .table-row-hover:hover {
