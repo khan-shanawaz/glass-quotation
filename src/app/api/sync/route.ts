@@ -125,7 +125,7 @@ export async function POST(request: Request) {
       await turso.execute("DELETE FROM saved_quotations;");
       for (const q of savedQuotations) {
         await turso.execute({
-          sql: `INSERT INTO saved_quotations (id, quoteNumber, date, customerName, customerPhone, customerEmail, notes, items, discount, isDiscountFlat, transportCharges, labourCharges, isTaxEnabled, summary, isConvertedToProject, sizeHeading, unitHeading, documentTitle)
+          sql: `INSERT OR REPLACE INTO saved_quotations (id, quoteNumber, date, customerName, customerPhone, customerEmail, notes, items, discount, isDiscountFlat, transportCharges, labourCharges, isTaxEnabled, summary, isConvertedToProject, sizeHeading, unitHeading, documentTitle)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
           args: [
             q.id,
@@ -155,7 +155,7 @@ export async function POST(request: Request) {
       await turso.execute("DELETE FROM projects;");
       for (const p of projects) {
         await turso.execute({
-          sql: `INSERT INTO projects (id, quoteId, quoteNumber, customerName, customerPhone, amount, status, dateCreated, tasks)
+          sql: `INSERT OR REPLACE INTO projects (id, quoteId, quoteNumber, customerName, customerPhone, amount, status, dateCreated, tasks)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
           args: [p.id, p.quoteId || '', p.quoteNumber || '', p.customerName, p.customerPhone, p.amount || 0, p.status, p.dateCreated, JSON.stringify(p.tasks || [])]
         });
@@ -166,7 +166,7 @@ export async function POST(request: Request) {
       await turso.execute("DELETE FROM customers;");
       for (const c of customers) {
         await turso.execute({
-          sql: `INSERT INTO customers (id, name, phone, email, totalOrdersAmount, totalQuotationsCount, lastActive)
+          sql: `INSERT OR REPLACE INTO customers (id, name, phone, email, totalOrdersAmount, totalQuotationsCount, lastActive)
                 VALUES (?, ?, ?, ?, ?, ?, ?);`,
           args: [c.id, c.name, c.phone, c.email, c.totalOrdersAmount || 0, c.totalQuotationsCount || 0, c.lastActive]
         });

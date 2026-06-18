@@ -120,6 +120,12 @@ interface QuotationContextType {
   importQuotations: (quotes: SavedQuotation[]) => void;
   importProjects: (projects: ProjectItem[]) => void;
   importCustomers: (customers: CustomerItem[]) => void;
+  isSyncing: boolean;
+  lastSynced: string | null;
+  syncStatus: 'idle' | 'success' | 'error';
+  syncData: () => Promise<boolean>;
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (collapsed: boolean) => void;
 }
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
@@ -157,6 +163,17 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
   const [categories, setCategories] = useState<string[]>(['door', 'window', 'mirror', 'frame', 'custom']);
+  
+  // Sync states
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+
+  const toggleSidebarCollapsed = (collapsed: boolean) => {
+    setSidebarCollapsed(collapsed);
+    localStorage.setItem('glass_saas_sidebar_collapsed', String(collapsed));
+  };
 
   // Database sync helper
   const triggerDBSync = async (
@@ -183,6 +200,42 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
+  const syncData = async () => {
+    setIsSyncing(true);
+    setSyncStatus('idle');
+    try {
+      const res = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyProfile,
+          savedQuotations,
+          projects,
+          customers,
+          categories
+        })
+      });
+      if (res.ok) {
+        setSyncStatus('success');
+        const now = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setLastSynced(now);
+        setTimeout(() => setSyncStatus('idle'), 3000);
+        return true;
+      } else {
+        setSyncStatus('error');
+        setTimeout(() => setSyncStatus('idle'), 3000);
+        return false;
+      }
+    } catch (e) {
+      console.error('Manual sync failed:', e);
+      setSyncStatus('error');
+      setTimeout(() => setSyncStatus('idle'), 3000);
+      return false;
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Load state from localStorage on client-side mount and sync from DB
   useEffect(() => {
     const localDraft = localStorage.getItem('glass_saas_draft');
@@ -191,6 +244,7 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const localCustomers = localStorage.getItem('glass_saas_customers');
     const localProfile = localStorage.getItem('glass_saas_profile');
     const localCategories = localStorage.getItem('glass_saas_categories');
+    const localSidebar = localStorage.getItem('glass_saas_sidebar_collapsed');
 
     if (localDraft) {
       try { setDraft(JSON.parse(localDraft)); } catch (e) { console.error(e); }
@@ -209,6 +263,9 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
     if (localCategories) {
       try { setCategories(JSON.parse(localCategories)); } catch (e) { console.error(e); }
+    }
+    if (localSidebar) {
+      setSidebarCollapsed(localSidebar === 'true');
     }
 
     // Background sync from Turso/Supabase cloud DB
@@ -803,6 +860,12 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         addCategory,
         removeCategory,
         updateCategory,
+        isSyncing,
+        lastSynced,
+        syncStatus,
+        syncData,
+        sidebarCollapsed,
+        setSidebarCollapsed: toggleSidebarCollapsed,
       }}
     >
       {children}
