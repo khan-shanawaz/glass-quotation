@@ -184,6 +184,11 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     cats = categories
   ) => {
     try {
+      const customSupabaseUrl = localStorage.getItem('glass_saas_supabase_url') || '';
+      const customSupabaseKey = localStorage.getItem('glass_saas_supabase_key') || '';
+      const customTursoUrl = localStorage.getItem('glass_saas_turso_url') || '';
+      const customTursoToken = localStorage.getItem('glass_saas_turso_token') || '';
+
       await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -192,7 +197,11 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           savedQuotations: quotes,
           projects: projs,
           customers: custs,
-          categories: cats
+          categories: cats,
+          supabaseUrl: customSupabaseUrl,
+          supabaseKey: customSupabaseKey,
+          tursoUrl: customTursoUrl,
+          tursoToken: customTursoToken
         })
       });
     } catch (e) {
@@ -204,6 +213,11 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsSyncing(true);
     setSyncStatus('idle');
     try {
+      const customSupabaseUrl = localStorage.getItem('glass_saas_supabase_url') || '';
+      const customSupabaseKey = localStorage.getItem('glass_saas_supabase_key') || '';
+      const customTursoUrl = localStorage.getItem('glass_saas_turso_url') || '';
+      const customTursoToken = localStorage.getItem('glass_saas_turso_token') || '';
+
       const res = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -212,7 +226,11 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           savedQuotations,
           projects,
           customers,
-          categories
+          categories,
+          supabaseUrl: customSupabaseUrl,
+          supabaseKey: customSupabaseKey,
+          tursoUrl: customTursoUrl,
+          tursoToken: customTursoToken
         })
       });
       if (res.ok) {
@@ -271,7 +289,18 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // Background sync from Turso/Supabase cloud DB
     const syncFromDB = async () => {
       try {
-        const res = await fetch('/api/sync');
+        const customSupabaseUrl = localStorage.getItem('glass_saas_supabase_url') || '';
+        const customSupabaseKey = localStorage.getItem('glass_saas_supabase_key') || '';
+        const customTursoUrl = localStorage.getItem('glass_saas_turso_url') || '';
+        const customTursoToken = localStorage.getItem('glass_saas_turso_token') || '';
+
+        const urlParams = new URLSearchParams();
+        if (customSupabaseUrl) urlParams.append('supabaseUrl', customSupabaseUrl);
+        if (customSupabaseKey) urlParams.append('supabaseKey', customSupabaseKey);
+        if (customTursoUrl) urlParams.append('tursoUrl', customTursoUrl);
+        if (customTursoToken) urlParams.append('tursoToken', customTursoToken);
+
+        const res = await fetch(`/api/sync?${urlParams.toString()}`);
         if (res.ok) {
           const data = await res.json();
           if (data.success) {

@@ -4,9 +4,17 @@ import React, { useState, useEffect } from 'react';
 import { useQuotation, CompanyProfile } from '@/context/QuotationContext';
 
 export default function SettingsPage() {
-  const { companyProfile, updateCompanyProfile, resetCompanyProfile } = useQuotation();
+  const { 
+    companyProfile, 
+    updateCompanyProfile, 
+    resetCompanyProfile,
+    isSyncing,
+    lastSynced,
+    syncStatus,
+    syncData
+  } = useQuotation();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'terms' | 'bank'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'terms' | 'bank' | 'database'>('profile');
 
   // Local state for configuration form fields
   const [companyName, setCompanyName] = useState('');
@@ -17,6 +25,12 @@ export default function SettingsPage() {
   const [logoBase64, setLogoBase64] = useState('');
   const [termsAndConditions, setTermsAndConditions] = useState('');
   const [bankDetails, setBankDetails] = useState('');
+
+  // Local state for database configuration credentials
+  const [supabaseUrl, setSupabaseUrl] = useState('');
+  const [supabaseKey, setSupabaseKey] = useState('');
+  const [tursoUrl, setTursoUrl] = useState('');
+  const [tursoToken, setTursoToken] = useState('');
 
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -32,6 +46,12 @@ export default function SettingsPage() {
       setTermsAndConditions(companyProfile.termsAndConditions || '');
       setBankDetails(companyProfile.bankDetails || '');
     }
+
+    // Load custom database credentials from localStorage
+    setSupabaseUrl(localStorage.getItem('glass_saas_supabase_url') || '');
+    setSupabaseKey(localStorage.getItem('glass_saas_supabase_key') || '');
+    setTursoUrl(localStorage.getItem('glass_saas_turso_url') || '');
+    setTursoToken(localStorage.getItem('glass_saas_turso_token') || '');
   }, [companyProfile]);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,6 +101,18 @@ export default function SettingsPage() {
     setTimeout(() => setSaveSuccess(false), 3000);
   };
 
+  const handleSaveDatabase = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    localStorage.setItem('glass_saas_supabase_url', supabaseUrl.trim());
+    localStorage.setItem('glass_saas_supabase_key', supabaseKey.trim());
+    localStorage.setItem('glass_saas_turso_url', tursoUrl.trim());
+    localStorage.setItem('glass_saas_turso_token', tursoToken.trim());
+
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
   const handleReset = () => {
     if (confirm('Are you sure you want to reset all company configurations and logo to standard defaults?')) {
       resetCompanyProfile();
@@ -95,7 +127,7 @@ export default function SettingsPage() {
         <div>
           <h1>Company Setup & Billing Configurations</h1>
           <p style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Configure your corporate profiles, set up default tax rates, and manage invoice header logo displays.
+            Configure your corporate profiles, set up default tax rates, and manage invoice database sync settings.
           </p>
         </div>
         <button type="button" onClick={handleReset} className="btn btn-secondary no-print">
@@ -156,6 +188,23 @@ export default function SettingsPage() {
         >
           Bank Details
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('database')}
+          style={{
+            padding: '12px 24px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'database' ? '2px solid var(--primary)' : '2px solid transparent',
+            color: activeTab === 'database' ? 'var(--primary)' : 'var(--text-primary)',
+            fontWeight: 700,
+            cursor: 'pointer',
+            fontSize: '1rem',
+            transition: 'all var(--transition-fast)'
+          }}
+        >
+          Cloud Database Config
+        </button>
       </div>
 
       {saveSuccess && (
@@ -163,7 +212,7 @@ export default function SettingsPage() {
           <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          Configurations saved successfully! These details will render on all newly generated printed invoice sheets.
+          Configurations saved successfully!
         </div>
       )}
 
@@ -422,6 +471,108 @@ export default function SettingsPage() {
             </div>
           </div>
         </form>
+      )}
+
+      {activeTab === 'database' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px', alignItems: 'start' }}>
+          {/* Left Card: Database Config Form */}
+          <form onSubmit={handleSaveDatabase} className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px', color: 'var(--primary)' }}>
+              Supabase & Turso Credentials
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Configure your cloud database URLs and keys to store quotations, projects, and client records securely in the cloud.
+            </p>
+
+            <h4 style={{ fontSize: '0.9rem', color: 'var(--primary)', marginTop: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Supabase Config</h4>
+            <div className="form-group">
+              <label className="form-label">Supabase URL</label>
+              <input
+                type="text"
+                placeholder="e.g. https://xxxxxx.supabase.co"
+                className="form-input font-mono"
+                value={supabaseUrl}
+                onChange={(e) => setSupabaseUrl(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Supabase Anon Key</label>
+              <input
+                type="password"
+                placeholder="Anon/Publishable key"
+                className="form-input font-mono"
+                value={supabaseKey}
+                onChange={(e) => setSupabaseKey(e.target.value)}
+              />
+            </div>
+
+            <h4 style={{ fontSize: '0.9rem', color: 'var(--primary)', marginTop: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Turso Config</h4>
+            <div className="form-group">
+              <label className="form-label">Turso Database URL</label>
+              <input
+                type="text"
+                placeholder="e.g. libsql://xxxxxx.turso.io"
+                className="form-input font-mono"
+                value={tursoUrl}
+                onChange={(e) => setTursoUrl(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Turso Auth Token</label>
+              <input
+                type="password"
+                placeholder="Database token"
+                className="form-input font-mono"
+                value={tursoToken}
+                onChange={(e) => setTursoToken(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--glass-border)', paddingTop: '16px', marginTop: '12px' }}>
+              <button type="submit" className="btn btn-primary" style={{ padding: '12px 32px' }}>
+                Save Database Config
+              </button>
+            </div>
+          </form>
+
+          {/* Right Card: Manual Sync Trigger */}
+          <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px', color: 'var(--primary)' }}>
+              Manual Data Synchronization
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Force upload all local quotations, custom categories, profile setups, and customers from the browser's local memory to your configured cloud databases.
+            </p>
+
+            <button
+              onClick={syncData}
+              disabled={isSyncing}
+              className={`btn-sync ${syncStatus === 'success' ? 'btn-sync-success' : syncStatus === 'error' ? 'btn-sync-error' : ''}`}
+              style={{ padding: '14px 20px', fontSize: '1rem', width: '100%', borderRadius: 'var(--radius-sm)' }}
+            >
+              <svg className={isSyncing ? 'animate-spin' : ''} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+              {isSyncing ? 'Synchronizing Cloud Databases...' : 'Sync & Update Database'}
+            </button>
+
+            {lastSynced && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '8px' }}>
+                <strong>Last Synced At:</strong> {lastSynced}
+              </p>
+            )}
+
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: '16px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              <h5 style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>Sync Details:</h5>
+              <ul style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <li>Rewrites the current local invoice database state to both Turso and Supabase.</li>
+                <li>Verify your network connection and credentials if the sync indicators turn red.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

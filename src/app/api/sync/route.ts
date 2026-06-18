@@ -1,22 +1,42 @@
 import { NextResponse } from 'next/server';
-import { turso } from '@/utils/turso';
-import { createClient } from '@supabase/supabase-js';
+import { turso as defaultTurso } from '@/utils/turso';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient as createTursoClient } from '@libsql/client';
 
 export const dynamic = 'force-dynamic';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+function getTursoClient(customUrl?: string | null, customToken?: string | null) {
+  const url = customUrl || process.env.TURSO_DATABASE_URL;
+  const authToken = customToken || process.env.TURSO_AUTH_TOKEN;
+  if (url && url !== 'libsql://dummy-for-vercel-build.db') {
+    return createTursoClient({ url, authToken });
+  }
+  return defaultTurso;
+}
 
-const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+function getSupabaseClient(customUrl?: string | null, customKey?: string | null) {
+  const url = customUrl || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = customKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (url && key) {
+    return createSupabaseClient(url, key);
+  }
+  return null;
+}
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const customTursoUrl = searchParams.get('tursoUrl');
+    const customTursoToken = searchParams.get('tursoToken');
+
+    const dbTurso = getTursoClient(customTursoUrl, customTursoToken);
+
     // 1. Get from Turso
-    const profileResult = await turso.execute("SELECT * FROM company_profile LIMIT 1;");
-    const quotesResult = await turso.execute("SELECT * FROM saved_quotations;");
-    const projectsResult = await turso.execute("SELECT * FROM projects;");
-    const customersResult = await turso.execute("SELECT * FROM customers;");
-    const categoriesResult = await turso.execute("SELECT * FROM categories;");
+    const profileResult = await dbTurso.execute("SELECT * FROM company_profile LIMIT 1;");
+    const quotesResult = await dbTurso.execute("SELECT * FROM saved_quotations;");
+    const projectsResult = await dbTurso.execute("SELECT * FROM projects;");
+    const customersResult = await dbTurso.execute("SELECT * FROM customers;");
+    const categoriesResult = await dbTurso.execute("SELECT * FROM categories;");
 
     // Format profiles
     let companyProfile = null;
@@ -100,11 +120,24 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { companyProfile, savedQuotations, projects, customers, categories } = body;
+    const { 
+      companyProfile, 
+      savedQuotations, 
+      projects, 
+      customers, 
+      categories,
+      supabaseUrl: customSupabaseUrl,
+      supabaseKey: customSupabaseKey,
+      tursoUrl: customTursoUrl,
+      tursoToken: customTursoToken
+    } = body;
+
+    const dbTurso = getTursoClient(customTursoUrl, customTursoToken);
+    const dbSupabase = getSupabaseClient(customSupabaseUrl, customSupabaseKey);
 
     // --- 1. Sync to Turso ---
     if (companyProfile) {
-      await turso.execute({
+      await dbTurso.execute({
         sql: `INSERT OR REPLACE INTO company_profile (id, companyName, companyAddress, companyPhone, companyEmail, taxRate, logoBase64, termsAndConditions, bankDetails) 
               VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?);`,
         args: [
@@ -122,9 +155,9 @@ export async function POST(request: Request) {
 
     if (savedQuotations && Array.isArray(savedQuotations)) {
       // Clear and re-populate for simplicity
-      await turso.execute("DELETE FROM saved_quotations;");
+      await dbTurso.execute("DELETE FROM saved_quotations;");
       for (const q of savedQuotations) {
-        await turso.execute({
+        await dbTurso.execute({
           sql: `INSERT OR REPLACE INTO saved_quotations (id, quoteNumber, date, customerName, customerPhone, customerEmail, notes, items, discount, isDiscountFlat, transportCharges, labourCharges, isTaxEnabled, summary, isConvertedToProject, sizeHeading, unitHeading, documentTitle)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
           args: [
@@ -152,9 +185,9 @@ export async function POST(request: Request) {
     }
 
     if (projects && Array.isArray(projects)) {
-      await turso.execute("DELETE FROM projects;");
+      await dbTurso.execute("DELETE FROM projects;");
       for (const p of projects) {
-        await turso.execute({
+        await dbTurso.execute({
           sql: `INSERT OR REPLACE INTO projects (id, quoteId, quoteNumber, customerName, customerPhone, amount, status, dateCreated, tasks)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
           args: [p.id, p.quoteId || '', p.quoteNumber || '', p.customerName, p.customerPhone, p.amount || 0, p.status, p.dateCreated, JSON.stringify(p.tasks || [])]
@@ -163,9 +196,9 @@ export async function POST(request: Request) {
     }
 
     if (customers && Array.isArray(customers)) {
-      await turso.execute("DELETE FROM customers;");
+      await dbTurso.execute("DELETE FROM customers;");
       for (const c of customers) {
-        await turso.execute({
+        await dbTurso.execute({
           sql: `INSERT OR REPLACE INTO customers (id, name, phone, email, totalOrdersAmount, totalQuotationsCount, lastActive)
                 VALUES (?, ?, ?, ?, ?, ?, ?);`,
           args: [c.id, c.name, c.phone, c.email, c.totalOrdersAmount || 0, c.totalQuotationsCount || 0, c.lastActive]
@@ -174,9 +207,9 @@ export async function POST(request: Request) {
     }
 
     if (categories && Array.isArray(categories)) {
-      await turso.execute("DELETE FROM categories;");
+      await dbTurso.execute("DELETE FROM categories;");
       for (const name of categories) {
-        await turso.execute({
+        await dbTurso.execute({
           sql: "INSERT OR IGNORE INTO categories (name) VALUES (?);",
           args: [name]
         });
@@ -184,18 +217,18 @@ export async function POST(request: Request) {
     }
 
     // --- 2. Sync to Supabase (Non-blocking Try-Catch) ---
-    if (supabase) {
+    if (dbSupabase) {
       try {
         // Sync Company Profile
         if (companyProfile) {
-          await supabase.from('company_profile').upsert({
+          await dbSupabase.from('company_profile').upsert({
             id: 'default',
             company_name: companyProfile.companyName,
             company_address: companyProfile.companyAddress,
             company_phone: companyProfile.companyPhone,
             company_email: companyProfile.companyEmail,
             tax_rate: companyProfile.taxRate,
-            logo_base64: companyProfile.logoBase64 || '',
+            logo_base_64: companyProfile.logoBase64 || '',
             terms_and_conditions: companyProfile.termsAndConditions || '',
             bank_details: companyProfile.bankDetails || '',
           });
@@ -225,9 +258,9 @@ export async function POST(request: Request) {
           }));
           
           // Truncate and upsert
-          await supabase.from('saved_quotations').delete().neq('id', 'dummy');
+          await dbSupabase.from('saved_quotations').delete().neq('id', 'dummy');
           if (formattedQuotes.length > 0) {
-            await supabase.from('saved_quotations').upsert(formattedQuotes);
+            await dbSupabase.from('saved_quotations').upsert(formattedQuotes);
           }
         }
 
@@ -243,9 +276,9 @@ export async function POST(request: Request) {
             status: p.status,
             date_created: p.dateCreated,
           }));
-          await supabase.from('projects').delete().neq('id', 'dummy');
+          await dbSupabase.from('projects').delete().neq('id', 'dummy');
           if (formattedProjects.length > 0) {
-            await supabase.from('projects').upsert(formattedProjects);
+            await dbSupabase.from('projects').upsert(formattedProjects);
           }
         }
 
@@ -260,18 +293,18 @@ export async function POST(request: Request) {
             total_quotations_count: c.totalQuotationsCount || 0,
             last_active: c.lastActive,
           }));
-          await supabase.from('customers').delete().neq('id', 'dummy');
+          await dbSupabase.from('customers').delete().neq('id', 'dummy');
           if (formattedCustomers.length > 0) {
-            await supabase.from('customers').upsert(formattedCustomers);
+            await dbSupabase.from('customers').upsert(formattedCustomers);
           }
         }
 
         // Sync Categories
         if (categories && Array.isArray(categories)) {
           const formattedCategories = categories.map(name => ({ name }));
-          await supabase.from('categories').delete().neq('name', 'dummy');
+          await dbSupabase.from('categories').delete().neq('name', 'dummy');
           if (formattedCategories.length > 0) {
-            await supabase.from('categories').upsert(formattedCategories);
+            await dbSupabase.from('categories').upsert(formattedCategories);
           }
         }
       } catch (sbErr) {
