@@ -48,10 +48,10 @@ export default function SettingsPage() {
     }
 
     // Load custom database credentials from localStorage
-    setSupabaseUrl(localStorage.getItem('glass_saas_supabase_url') || '');
-    setSupabaseKey(localStorage.getItem('glass_saas_supabase_key') || '');
-    setTursoUrl(localStorage.getItem('glass_saas_turso_url') || '');
-    setTursoToken(localStorage.getItem('glass_saas_turso_token') || '');
+    setSupabaseUrl(localStorage.getItem('glass_saas_supabase_url') || 'https://rdeoheklhcwccixwaeox.supabase.co');
+    setSupabaseKey(localStorage.getItem('glass_saas_supabase_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkZW9oZWtsaGN3Y2NpeHdhZW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNDQxNjEsImV4cCI6MjA5NjgyMDE2MX0.dLgKJ8Ay7zo91K4vyXC2uKMuAKhzj8rUPUb3b7PBKoA');
+    setTursoUrl(localStorage.getItem('glass_saas_turso_url') || 'libsql://glassquote-khan-shanawaz.aws-ap-south-1.turso.io');
+    setTursoToken(localStorage.getItem('glass_saas_turso_token') || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODEzMzE5MDAsImlkIjoiMDE5ZWJmYTctODYwMS03ODBkLTgwMzgtMTBhMjU2NTNmZDY4IiwicmlkIjoiZjBhN2M4MTMtMTgyYS00YzRjLTg1ZjEtMjZlNWRmMjJhNjdkIn0.-XJMdBrnP9jumN18a7yNIKsHfD0QZMkWf787iEAi0bN_tQtB8qBAbF-dKWAZyZIkV7p8cI--JQHpZd10PWbWCA');
   }, [companyProfile]);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

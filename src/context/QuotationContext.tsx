@@ -184,10 +184,10 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     cats = categories
   ) => {
     try {
-      const customSupabaseUrl = localStorage.getItem('glass_saas_supabase_url') || '';
-      const customSupabaseKey = localStorage.getItem('glass_saas_supabase_key') || '';
-      const customTursoUrl = localStorage.getItem('glass_saas_turso_url') || '';
-      const customTursoToken = localStorage.getItem('glass_saas_turso_token') || '';
+      const customSupabaseUrl = localStorage.getItem('glass_saas_supabase_url') || 'https://rdeoheklhcwccixwaeox.supabase.co';
+      const customSupabaseKey = localStorage.getItem('glass_saas_supabase_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkZW9oZWtsaGN3Y2NpeHdhZW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNDQxNjEsImV4cCI6MjA5NjgyMDE2MX0.dLgKJ8Ay7zo91K4vyXC2uKMuAKhzj8rUPUb3b7PBKoA';
+      const customTursoUrl = localStorage.getItem('glass_saas_turso_url') || 'libsql://glassquote-khan-shanawaz.aws-ap-south-1.turso.io';
+      const customTursoToken = localStorage.getItem('glass_saas_turso_token') || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODEzMzE5MDAsImlkIjoiMDE5ZWJmYTctODYwMS03ODBkLTgwMzgtMTBhMjU2NTNmZDY4IiwicmlkIjoiZjBhN2M4MTMtMTgyYS00YzRjLTg1ZjEtMjZlNWRmMjJhNjdkIn0.-XJMdBrnP9jumN18a7yNIKsHfD0QZMkWf787iEAi0bN_tQtB8qBAbF-dKWAZyZIkV7p8cI--JQHpZd10PWbWCA';
 
       await fetch('/api/sync', {
         method: 'POST',
@@ -213,10 +213,10 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsSyncing(true);
     setSyncStatus('idle');
     try {
-      const customSupabaseUrl = localStorage.getItem('glass_saas_supabase_url') || '';
-      const customSupabaseKey = localStorage.getItem('glass_saas_supabase_key') || '';
-      const customTursoUrl = localStorage.getItem('glass_saas_turso_url') || '';
-      const customTursoToken = localStorage.getItem('glass_saas_turso_token') || '';
+      const customSupabaseUrl = localStorage.getItem('glass_saas_supabase_url') || 'https://rdeoheklhcwccixwaeox.supabase.co';
+      const customSupabaseKey = localStorage.getItem('glass_saas_supabase_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkZW9oZWtsaGN3Y2NpeHdhZW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNDQxNjEsImV4cCI6MjA5NjgyMDE2MX0.dLgKJ8Ay7zo91K4vyXC2uKMuAKhzj8rUPUb3b7PBKoA';
+      const customTursoUrl = localStorage.getItem('glass_saas_turso_url') || 'libsql://glassquote-khan-shanawaz.aws-ap-south-1.turso.io';
+      const customTursoToken = localStorage.getItem('glass_saas_turso_token') || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODEzMzE5MDAsImlkIjoiMDE5ZWJmYTctODYwMS03ODBkLTgwMzgtMTBhMjU2NTNmZDY4IiwicmlkIjoiZjBhN2M4MTMtMTgyYS00YzRjLTg1ZjEtMjZlNWRmMjJhNjdkIn0.-XJMdBrnP9jumN18a7yNIKsHfD0QZMkWf787iEAi0bN_tQtB8qBAbF-dKWAZyZIkV7p8cI--JQHpZd10PWbWCA';
 
       const res = await fetch('/api/sync', {
         method: 'POST',
