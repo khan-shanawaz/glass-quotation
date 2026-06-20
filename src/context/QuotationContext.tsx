@@ -126,6 +126,7 @@ interface QuotationContextType {
   syncData: () => Promise<boolean>;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  hasUnsyncedChanges: boolean;
 }
 
 const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
@@ -169,10 +170,281 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState<boolean>(false);
 
   const toggleSidebarCollapsed = (collapsed: boolean) => {
     setSidebarCollapsed(collapsed);
     localStorage.setItem('glass_saas_sidebar_collapsed', String(collapsed));
+  };
+
+  const checkUnsyncedChanges = async (): Promise<boolean> => {
+    try {
+      const { queryDuckDB } = await import('@/utils/duckdb');
+      const qCount = await queryDuckDB('SELECT COUNT(*) as count FROM saved_quotations WHERE is_dirty = 1');
+      const pCount = await queryDuckDB('SELECT COUNT(*) as count FROM projects WHERE is_dirty = 1');
+      const cCount = await queryDuckDB('SELECT COUNT(*) as count FROM customers WHERE is_dirty = 1');
+      const catCount = await queryDuckDB('SELECT COUNT(*) as count FROM categories WHERE is_dirty = 1');
+      const profCount = await queryDuckDB("SELECT COUNT(*) as count FROM company_profile WHERE is_dirty = 1");
+      
+      const total = (qCount[0]?.count || 0) + (pCount[0]?.count || 0) + (cCount[0]?.count || 0) + (catCount[0]?.count || 0) + (profCount[0]?.count || 0);
+      return total > 0;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const loadStateFromDuckDB = async () => {
+    try {
+      const { queryDuckDB } = await import('@/utils/duckdb');
+      
+      // Seed DuckDB if empty (backwards compatibility with localStorage)
+      const quotesCount = await queryDuckDB('SELECT COUNT(*) as count FROM saved_quotations');
+      if (quotesCount[0]?.count === 0) {
+        const localSaved = localStorage.getItem('glass_saas_saved');
+        const localProjects = localStorage.getItem('glass_saas_projects');
+        const localCustomers = localStorage.getItem('glass_saas_customers');
+        const localProfile = localStorage.getItem('glass_saas_profile');
+        const localCategories = localStorage.getItem('glass_saas_categories');
+
+        let seedProfile = DEFAULT_COMPANY_PROFILE;
+        let seedQuotes: SavedQuotation[] = [];
+        let seedProjects: ProjectItem[] = [];
+        let seedCustomers: CustomerItem[] = [];
+        let seedCats: string[] = [];
+
+        if (localProfile) { try { seedProfile = JSON.parse(localProfile); } catch(e){} }
+        if (localSaved) { try { seedQuotes = JSON.parse(localSaved); } catch(e){} }
+        if (localProjects) { try { seedProjects = JSON.parse(localProjects); } catch(e){} }
+        if (localCustomers) { try { seedCustomers = JSON.parse(localCustomers); } catch(e){} }
+        if (localCategories) { try { seedCats = JSON.parse(localCategories); } catch(e){} }
+
+        await writeToLocalDuckDB(seedProfile, seedQuotes, seedProjects, seedCustomers, seedCats, false);
+      }
+
+      // Load company profile
+      const profiles = await queryDuckDB('SELECT * FROM company_profile WHERE id = \'default\'');
+      if (profiles.length > 0) {
+        const p = profiles[0];
+        setCompanyProfile({
+          companyName: p.companyName,
+          companyAddress: p.companyAddress,
+          companyPhone: p.companyPhone,
+          companyEmail: p.companyEmail,
+          taxRate: p.taxRate,
+          logoBase64: p.logoBase64 || '',
+          termsAndConditions: p.termsAndConditions || '',
+          bankDetails: p.bankDetails || '',
+        });
+      }
+
+      // Load saved quotations
+      const quotes = await queryDuckDB('SELECT * FROM saved_quotations WHERE deleted = 0');
+      setSavedQuotations(quotes.map(q => ({
+        ...q,
+        items: JSON.parse(q.items || '[]'),
+        summary: JSON.parse(q.summary || '{}'),
+        isDiscountFlat: q.isDiscountFlat === 1,
+        isTaxEnabled: q.isTaxEnabled === 1,
+        isConvertedToProject: q.isConvertedToProject === 1
+      })));
+
+      // Load projects
+      const projs = await queryDuckDB('SELECT * FROM projects WHERE deleted = 0');
+      setProjects(projs.map(p => ({
+        ...p,
+        tasks: JSON.parse(p.tasks || '[]')
+      })));
+
+      // Load customers
+      const custs = await queryDuckDB('SELECT * FROM customers WHERE deleted = 0');
+      setCustomers(custs);
+
+      // Load categories
+      const cats = await queryDuckDB('SELECT * FROM categories WHERE deleted = 0');
+      setCategories(cats.map(c => c.name));
+
+      const unsynced = await checkUnsyncedChanges();
+      setHasUnsyncedChanges(unsynced);
+    } catch (e) {
+      console.error('Failed to load state from DuckDB:', e);
+    }
+  };
+
+  const writeToLocalDuckDB = async (
+    profile: CompanyProfile,
+    quotes: SavedQuotation[],
+    projs: ProjectItem[],
+    custs: CustomerItem[],
+    cats: string[],
+    markDirty = true
+  ) => {
+    try {
+      const { getDuckDBConnection } = await import('@/utils/duckdb');
+      const conn = await getDuckDBConnection();
+      
+      const getDirtyMap = async (tableName: string, idCol = 'id') => {
+        const res = await conn.query(`SELECT ${idCol}, is_dirty FROM ${tableName}`);
+        const map = new Map<string, number>();
+        res.toArray().forEach((row: any) => {
+          map.set(row[idCol], row.is_dirty);
+        });
+        return map;
+      };
+
+      const profileDirtyMap = await getDirtyMap('company_profile');
+      const profileDirty = markDirty ? 1 : (profileDirtyMap.get('default') || 0);
+
+      // 1. Company Profile
+      const stmtProfile = await conn.prepare(`
+        INSERT OR REPLACE INTO company_profile (id, companyName, companyAddress, companyPhone, companyEmail, taxRate, logoBase64, termsAndConditions, bankDetails, updated_at, is_dirty)
+        VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      `);
+      await stmtProfile.query(
+        profile.companyName,
+        profile.companyAddress,
+        profile.companyPhone,
+        profile.companyEmail,
+        profile.taxRate,
+        profile.logoBase64 || '',
+        profile.termsAndConditions || '',
+        profile.bankDetails || '',
+        new Date().toISOString(),
+        profileDirty
+      );
+      await stmtProfile.close();
+
+      // 2. Saved Quotations
+      const quotesDirtyMap = await getDirtyMap('saved_quotations');
+      const stmtQuote = await conn.prepare(`
+        INSERT OR REPLACE INTO saved_quotations (id, quoteNumber, date, customerName, customerPhone, customerEmail, notes, items, discount, isDiscountFlat, transportCharges, labourCharges, isTaxEnabled, summary, isConvertedToProject, sizeHeading, unitHeading, documentTitle, updated_at, is_dirty, deleted)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
+      `);
+      for (const q of quotes) {
+        const existingDirty = quotesDirtyMap.get(q.id) || 0;
+        const isDirty = markDirty ? 1 : existingDirty;
+        await stmtQuote.query(
+          q.id,
+          q.quoteNumber,
+          q.date,
+          q.customerName,
+          q.customerPhone,
+          q.customerEmail,
+          q.notes || '',
+          JSON.stringify(q.items),
+          q.discount || 0,
+          q.isDiscountFlat ? 1 : 0,
+          q.transportCharges || 0,
+          q.labourCharges || 0,
+          q.isTaxEnabled !== false ? 1 : 0,
+          JSON.stringify(q.summary),
+          q.isConvertedToProject ? 1 : 0,
+          q.sizeHeading || 'Size (Sq.Ft.)',
+          q.unitHeading || 'Qty (Units)',
+          q.documentTitle || 'QUOTATION',
+          new Date().toISOString(),
+          isDirty
+        );
+      }
+      await stmtQuote.close();
+
+      if (quotes.length > 0) {
+        const activeIds = quotes.map(q => `'${q.id}'`).join(',');
+        await conn.query(`DELETE FROM saved_quotations WHERE id NOT IN (${activeIds})`);
+      } else {
+        await conn.query(`DELETE FROM saved_quotations`);
+      }
+
+      // 3. Projects
+      const projectsDirtyMap = await getDirtyMap('projects');
+      const stmtProj = await conn.prepare(`
+        INSERT OR REPLACE INTO projects (id, quoteId, quoteNumber, customerName, customerPhone, amount, status, dateCreated, tasks, updated_at, is_dirty, deleted)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
+      `);
+      for (const p of projs) {
+        const existingDirty = projectsDirtyMap.get(p.id) || 0;
+        const isDirty = markDirty ? 1 : existingDirty;
+        await stmtProj.query(
+          p.id,
+          p.quoteId || '',
+          p.quoteNumber || '',
+          p.customerName,
+          p.customerPhone,
+          p.amount || 0,
+          p.status,
+          p.dateCreated,
+          JSON.stringify(p.tasks || []),
+          new Date().toISOString(),
+          isDirty
+        );
+      }
+      await stmtProj.close();
+
+      if (projs.length > 0) {
+        const activeIds = projs.map(p => `'${p.id}'`).join(',');
+        await conn.query(`DELETE FROM projects WHERE id NOT IN (${activeIds})`);
+      } else {
+        await conn.query(`DELETE FROM projects`);
+      }
+
+      // 4. Customers
+      const customersDirtyMap = await getDirtyMap('customers');
+      const stmtCust = await conn.prepare(`
+        INSERT OR REPLACE INTO customers (id, name, phone, email, totalOrdersAmount, totalQuotationsCount, lastActive, updated_at, is_dirty, deleted)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
+      `);
+      for (const c of custs) {
+        const existingDirty = customersDirtyMap.get(c.id) || 0;
+        const isDirty = markDirty ? 1 : existingDirty;
+        await stmtCust.query(
+          c.id,
+          c.name,
+          c.phone,
+          c.email,
+          c.totalOrdersAmount || 0,
+          c.totalQuotationsCount || 0,
+          c.lastActive,
+          new Date().toISOString(),
+          isDirty
+        );
+      }
+      await stmtCust.close();
+
+      if (custs.length > 0) {
+        const activeIds = custs.map(c => `'${c.id}'`).join(',');
+        await conn.query(`DELETE FROM customers WHERE id NOT IN (${activeIds})`);
+      } else {
+        await conn.query(`DELETE FROM customers`);
+      }
+
+      // 5. Categories
+      const categoriesDirtyMap = await getDirtyMap('categories', 'name');
+      const stmtCat = await conn.prepare(`
+        INSERT OR REPLACE INTO categories (name, updated_at, is_dirty, deleted)
+        VALUES (?, ?, ?, 0);
+      `);
+      for (const name of cats) {
+        const existingDirty = categoriesDirtyMap.get(name) || 0;
+        const isDirty = markDirty ? 1 : existingDirty;
+        await stmtCat.query(
+          name,
+          new Date().toISOString(),
+          isDirty
+        );
+      }
+      await stmtCat.close();
+
+      if (cats.length > 0) {
+        const activeNames = cats.map(c => `'${c}'`).join(',');
+        await conn.query(`DELETE FROM categories WHERE name NOT IN (${activeNames})`);
+      } else {
+        await conn.query(`DELETE FROM categories`);
+      }
+
+      const { syncDuckDBToFileStorage } = await import('@/utils/duckdb');
+      await syncDuckDBToFileStorage();
+    } catch (e) {
+      console.error('Error writing to DuckDB:', e);
+    }
   };
 
   // Database sync helper
@@ -183,13 +455,20 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     custs = customers,
     cats = categories
   ) => {
+    // 1. Write to local DuckDB (marking dirty)
+    await writeToLocalDuckDB(profile, quotes, projs, custs, cats, true);
+
+    const unsynced = await checkUnsyncedChanges();
+    setHasUnsyncedChanges(unsynced);
+
+    // 2. Try background sync
     try {
       const customSupabaseUrl = localStorage.getItem('glass_saas_supabase_url') || 'https://rdeoheklhcwccixwaeox.supabase.co';
       const customSupabaseKey = localStorage.getItem('glass_saas_supabase_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkZW9oZWtsaGN3Y2NpeHdhZW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNDQxNjEsImV4cCI6MjA5NjgyMDE2MX0.dLgKJ8Ay7zo91K4vyXC2uKMuAKhzj8rUPUb3b7PBKoA';
       const customTursoUrl = localStorage.getItem('glass_saas_turso_url') || 'libsql://glassquote-khan-shanawaz.aws-ap-south-1.turso.io';
       const customTursoToken = localStorage.getItem('glass_saas_turso_token') || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODEzMzE5MDAsImlkIjoiMDE5ZWJmYTctODYwMS03ODBkLTgwMzgtMTBhMjU2NTNmZDY4IiwicmlkIjoiZjBhN2M4MTMtMTgyYS00YzRjLTg1ZjEtMjZlNWRmMjJhNjdkIn0.-XJMdBrnP9jumN18a7yNIKsHfD0QZMkWf787iEAi0bN_tQtB8qBAbF-dKWAZyZIkV7p8cI--JQHpZd10PWbWCA';
 
-      await fetch('/api/sync', {
+      const res = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -204,8 +483,13 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           tursoToken: customTursoToken
         })
       });
+      if (res.ok) {
+        // Success: Mark local records clean in DuckDB
+        await writeToLocalDuckDB(profile, quotes, projs, custs, cats, false);
+        setHasUnsyncedChanges(false);
+      }
     } catch (e) {
-      console.error('Failed to post sync to database:', e);
+      console.warn('Background sync failed (offline or network error), local changes kept dirty:', e);
     }
   };
 
@@ -218,22 +502,101 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const customTursoUrl = localStorage.getItem('glass_saas_turso_url') || 'libsql://glassquote-khan-shanawaz.aws-ap-south-1.turso.io';
       const customTursoToken = localStorage.getItem('glass_saas_turso_token') || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODEzMzE5MDAsImlkIjoiMDE5ZWJmYTctODYwMS03ODBkLTgwMzgtMTBhMjU2NTNmZDY4IiwicmlkIjoiZjBhN2M4MTMtMTgyYS00YzRjLTg1ZjEtMjZlNWRmMjJhNjdkIn0.-XJMdBrnP9jumN18a7yNIKsHfD0QZMkWf787iEAi0bN_tQtB8qBAbF-dKWAZyZIkV7p8cI--JQHpZd10PWbWCA';
 
-      const res = await fetch('/api/sync', {
+      const urlParams = new URLSearchParams();
+      if (customSupabaseUrl) urlParams.append('supabaseUrl', customSupabaseUrl);
+      if (customSupabaseKey) urlParams.append('supabaseKey', customSupabaseKey);
+      if (customTursoUrl) urlParams.append('tursoUrl', customTursoUrl);
+      if (customTursoToken) urlParams.append('tursoToken', customTursoToken);
+
+      // --- 1. Pull Latest from Server (Server Wins) ---
+      const pullRes = await fetch(`/api/sync?${urlParams.toString()}`);
+      if (!pullRes.ok) {
+        throw new Error('Pull failed');
+      }
+      const cloudData = await pullRes.json();
+      
+      let mergedProfile = companyProfile;
+      let mergedQuotes = savedQuotations;
+      let mergedProjects = projects;
+      let mergedCustomers = customers;
+      let mergedCategories = categories;
+
+      if (cloudData.success) {
+        if (cloudData.companyProfile) mergedProfile = cloudData.companyProfile;
+        mergedQuotes = cloudData.savedQuotations || [];
+        mergedProjects = cloudData.projects || [];
+        mergedCustomers = cloudData.customers || [];
+        mergedCategories = cloudData.categories || [];
+
+        // Save server pull clean in local DuckDB
+        await writeToLocalDuckDB(mergedProfile, mergedQuotes, mergedProjects, mergedCustomers, mergedCategories, false);
+      }
+
+      // --- 2. Fetch the active state from local DuckDB ---
+      const { queryDuckDB } = await import('@/utils/duckdb');
+      const companyProfileRows = await queryDuckDB('SELECT * FROM company_profile WHERE id = \'default\'');
+      const savedQuotationsRows = await queryDuckDB('SELECT * FROM saved_quotations WHERE deleted = 0');
+      const projectsRows = await queryDuckDB('SELECT * FROM projects WHERE deleted = 0');
+      const customersRows = await queryDuckDB('SELECT * FROM customers WHERE deleted = 0');
+      const categoriesRows = await queryDuckDB('SELECT * FROM categories WHERE deleted = 0');
+
+      const finalProfile = companyProfileRows[0] ? {
+        companyName: companyProfileRows[0].companyName,
+        companyAddress: companyProfileRows[0].companyAddress,
+        companyPhone: companyProfileRows[0].companyPhone,
+        companyEmail: companyProfileRows[0].companyEmail,
+        taxRate: companyProfileRows[0].taxRate,
+        logoBase64: companyProfileRows[0].logoBase64 || '',
+        termsAndConditions: companyProfileRows[0].termsAndConditions || '',
+        bankDetails: companyProfileRows[0].bankDetails || '',
+      } : companyProfile;
+
+      const finalQuotes = savedQuotationsRows.map(q => ({
+        ...q,
+        items: JSON.parse(q.items || '[]'),
+        summary: JSON.parse(q.summary || '{}'),
+        isDiscountFlat: q.isDiscountFlat === 1,
+        isTaxEnabled: q.isTaxEnabled === 1,
+        isConvertedToProject: q.isConvertedToProject === 1
+      }));
+
+      const finalProjs = projectsRows.map(p => ({
+        ...p,
+        tasks: JSON.parse(p.tasks || '[]')
+      }));
+
+      const finalCusts = customersRows;
+      const finalCats = categoriesRows.map(c => c.name);
+
+      // --- 3. Push local merged state to Server ---
+      const pushRes = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          companyProfile,
-          savedQuotations,
-          projects,
-          customers,
-          categories,
+          companyProfile: finalProfile,
+          savedQuotations: finalQuotes,
+          projects: finalProjs,
+          customers: finalCusts,
+          categories: finalCats,
           supabaseUrl: customSupabaseUrl,
           supabaseKey: customSupabaseKey,
           tursoUrl: customTursoUrl,
           tursoToken: customTursoToken
         })
       });
-      if (res.ok) {
+
+      if (pushRes.ok) {
+        // Successfully synced and pushed, set clean
+        await writeToLocalDuckDB(finalProfile, finalQuotes, finalProjs, finalCusts, finalCats, false);
+
+        // Update React states
+        setCompanyProfile(finalProfile);
+        setSavedQuotations(finalQuotes);
+        setProjects(finalProjs);
+        setCustomers(finalCusts);
+        setCategories(finalCats);
+
+        setHasUnsyncedChanges(false);
         setSyncStatus('success');
         const now = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastSynced(now);
@@ -254,41 +617,37 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Load state from localStorage on client-side mount and sync from DB
+  // Initialize offline database and re-hydrate handle from IndexedDB
   useEffect(() => {
     const localDraft = localStorage.getItem('glass_saas_draft');
-    const localSaved = localStorage.getItem('glass_saas_saved');
-    const localProjects = localStorage.getItem('glass_saas_projects');
-    const localCustomers = localStorage.getItem('glass_saas_customers');
-    const localProfile = localStorage.getItem('glass_saas_profile');
-    const localCategories = localStorage.getItem('glass_saas_categories');
     const localSidebar = localStorage.getItem('glass_saas_sidebar_collapsed');
 
     if (localDraft) {
       try { setDraft(JSON.parse(localDraft)); } catch (e) { console.error(e); }
     }
-    if (localSaved) {
-      try { setSavedQuotations(JSON.parse(localSaved)); } catch (e) { console.error(e); }
-    }
-    if (localProjects) {
-      try { setProjects(JSON.parse(localProjects)); } catch (e) { console.error(e); }
-    }
-    if (localCustomers) {
-      try { setCustomers(JSON.parse(localCustomers)); } catch (e) { console.error(e); }
-    }
-    if (localProfile) {
-      try { setCompanyProfile(JSON.parse(localProfile)); } catch (e) { console.error(e); }
-    }
-    if (localCategories) {
-      try { setCategories(JSON.parse(localCategories)); } catch (e) { console.error(e); }
-    }
     if (localSidebar) {
       setSidebarCollapsed(localSidebar === 'true');
     }
 
-    // Background sync from Turso/Supabase cloud DB
-    const syncFromDB = async () => {
+    const initOfflineFirst = async () => {
       try {
+        const { getDuckDBConnection, getFolderHandle } = await import('@/utils/duckdb');
+        await getDuckDBConnection();
+
+        // Load offline storage directory from IndexedDB
+        const folderHandle = await getFolderHandle();
+        if (folderHandle) {
+          const opts = { mode: 'readwrite' as const };
+          const permission = await (folderHandle as any).queryPermission(opts);
+          if (permission === 'granted') {
+            (window as any).localDatabaseFolderHandle = folderHandle;
+          }
+        }
+
+        // Hydrate local states from DuckDB
+        await loadStateFromDuckDB();
+
+        // Pull latest from cloud
         const customSupabaseUrl = localStorage.getItem('glass_saas_supabase_url') || '';
         const customSupabaseKey = localStorage.getItem('glass_saas_supabase_key') || '';
         const customTursoUrl = localStorage.getItem('glass_saas_turso_url') || '';
@@ -304,33 +663,42 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (res.ok) {
           const data = await res.json();
           if (data.success) {
+            let mergedProfile = companyProfile;
             if (data.companyProfile) {
               setCompanyProfile(data.companyProfile);
-              localStorage.setItem('glass_saas_profile', JSON.stringify(data.companyProfile));
+              mergedProfile = data.companyProfile;
             }
+            let mergedQuotes = savedQuotations;
             if (data.savedQuotations && data.savedQuotations.length > 0) {
               setSavedQuotations(data.savedQuotations);
-              localStorage.setItem('glass_saas_saved', JSON.stringify(data.savedQuotations));
+              mergedQuotes = data.savedQuotations;
             }
+            let mergedProjects = projects;
             if (data.projects && data.projects.length > 0) {
               setProjects(data.projects);
-              localStorage.setItem('glass_saas_projects', JSON.stringify(data.projects));
+              mergedProjects = data.projects;
             }
+            let mergedCustomers = customers;
             if (data.customers && data.customers.length > 0) {
               setCustomers(data.customers);
-              localStorage.setItem('glass_saas_customers', JSON.stringify(data.customers));
+              mergedCustomers = data.customers;
             }
+            let mergedCategories = categories;
             if (data.categories && data.categories.length > 0) {
               setCategories(data.categories);
-              localStorage.setItem('glass_saas_categories', JSON.stringify(data.categories));
+              mergedCategories = data.categories;
             }
+
+            await writeToLocalDuckDB(mergedProfile, mergedQuotes, mergedProjects, mergedCustomers, mergedCategories, false);
+            setHasUnsyncedChanges(false);
           }
         }
       } catch (err) {
-        console.error('Failed to sync from database:', err);
+        console.error('Failed to initialize local offline DB or background sync pull:', err);
       }
     };
-    syncFromDB();
+
+    initOfflineFirst();
   }, []);
 
   // Save updates to localStorage helper functions
@@ -895,6 +1263,7 @@ export const QuotationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         syncData,
         sidebarCollapsed,
         setSidebarCollapsed: toggleSidebarCollapsed,
+        hasUnsyncedChanges,
       }}
     >
       {children}

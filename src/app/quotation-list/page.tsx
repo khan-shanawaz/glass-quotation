@@ -585,10 +585,9 @@ function QuotationListContent() {
                           <tr key={item.id} className="invoice-table-row">
                             <td style={{ padding: '8px', verticalAlign: 'middle' }}>
                               <div className="no-print">
-                                <input
-                                  type="text"
+                                <textarea
                                   className="table-inline-input"
-                                  style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)', width: '100%', marginBottom: '4px', borderBottom: '1px dashed var(--glass-border)' }}
+                                  style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)', width: '100%', marginBottom: '4px', borderBottom: '1px dashed var(--glass-border)', resize: 'vertical', minHeight: '36px', height: 'auto', display: 'block', fontFamily: 'var(--font-sans)' }}
                                   value={item.name}
                                   onChange={(e) => handleUpdateItem(item.id!, { name: e.target.value })}
                                   placeholder="Item Name"
@@ -603,8 +602,8 @@ function QuotationListContent() {
                                 />
                               </div>
                               <div className="print-only">
-                                <strong className="table-item-title">{item.name}</strong>
-                                <div style={{ fontSize: '0.75rem', marginTop: '2px', color: '#475569' }}>
+                                <strong className="table-item-title" style={{ whiteSpace: 'pre-wrap', display: 'block' }}>{item.name}</strong>
+                                <div style={{ fontSize: '0.75rem', marginTop: '2px', color: '#475569', whiteSpace: 'pre-wrap' }}>
                                   {item.description || 'No custom specs'}
                                 </div>
                               </div>
@@ -629,51 +628,63 @@ function QuotationListContent() {
                               </span>
                             </td>
                             <td style={{ padding: '8px', textAlign: 'right', verticalAlign: 'middle' }}>
-                              <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '2px' }}>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  className="table-inline-input font-mono"
-                                  style={{ width: '60px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)' }}
-                                  value={item.sizeSqFt || ''}
-                                  onChange={(e) => handleUpdateItem(item.id!, { sizeSqFt: safeNumber(e.target.value, 0) })}
-                                  placeholder="0.00"
-                                />
-                                <input
-                                  type="text"
-                                  className="table-inline-input"
-                                  style={{ width: '45px', padding: '2px', fontSize: '0.8rem', borderBottom: '1px dashed var(--glass-border)' }}
-                                  value={item.sizeUnit || 'sq.ft'}
-                                  onChange={(e) => handleUpdateItem(item.id!, { sizeUnit: e.target.value })}
-                                />
-                              </div>
-                              <span className="print-only" style={{ fontFamily: 'monospace' }}>
-                                {item.sizeSqFt.toFixed(2)} {item.sizeUnit || 'sq.ft'}
-                              </span>
+                              {!item.hideSize ? (
+                                <>
+                                  <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '2px' }}>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      className="table-inline-input font-mono"
+                                      style={{ width: '60px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)' }}
+                                      value={item.sizeSqFt || ''}
+                                      onChange={(e) => handleUpdateItem(item.id!, { sizeSqFt: safeNumber(e.target.value, 0) })}
+                                      placeholder="0.00"
+                                    />
+                                    <input
+                                      type="text"
+                                      className="table-inline-input"
+                                      style={{ width: '45px', padding: '2px', fontSize: '0.8rem', borderBottom: '1px dashed var(--glass-border)' }}
+                                      value={item.sizeUnit || 'sq.ft'}
+                                      onChange={(e) => handleUpdateItem(item.id!, { sizeUnit: e.target.value })}
+                                    />
+                                  </div>
+                                  <span className="print-only" style={{ fontFamily: 'monospace' }}>
+                                    {item.sizeSqFt.toFixed(2)} {item.sizeUnit || 'sq.ft'}
+                                  </span>
+                                </>
+                              ) : (
+                                <span style={{ color: 'var(--text-muted)' }}>—</span>
+                              )}
                             </td>
                             <td style={{ padding: '8px', textAlign: 'right', verticalAlign: 'middle' }}>
-                              <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '2px' }}>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  className="table-inline-input font-mono"
-                                  style={{ width: '45px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)' }}
-                                  value={item.quantity || ''}
-                                  onChange={(e) => handleUpdateItem(item.id!, { quantity: Math.max(0, Math.floor(safeNumber(e.target.value, 1))) })}
-                                  placeholder="1"
-                                />
-                                <input
-                                  type="text"
-                                  className="table-inline-input"
-                                  style={{ width: '35px', padding: '2px', fontSize: '0.8rem', borderBottom: '1px dashed var(--glass-border)' }}
-                                  value={item.qtyUnit || 'pcs'}
-                                  onChange={(e) => handleUpdateItem(item.id!, { qtyUnit: e.target.value })}
-                                />
-                              </div>
-                              <span className="print-only" style={{ fontWeight: 600 }}>
-                                {item.quantity} {item.qtyUnit || 'pcs'}
-                              </span>
+                              {!item.hideQty ? (
+                                <>
+                                  <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '2px' }}>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      className="table-inline-input font-mono"
+                                      style={{ width: '45px', padding: '2px', textAlign: 'right', borderBottom: '1px dashed var(--glass-border)' }}
+                                      value={item.quantity || ''}
+                                      onChange={(e) => handleUpdateItem(item.id!, { quantity: Math.max(0, Math.floor(safeNumber(e.target.value, 1))) })}
+                                      placeholder="1"
+                                    />
+                                    <input
+                                      type="text"
+                                      className="table-inline-input"
+                                      style={{ width: '35px', padding: '2px', fontSize: '0.8rem', borderBottom: '1px dashed var(--glass-border)' }}
+                                      value={item.qtyUnit || 'pcs'}
+                                      onChange={(e) => handleUpdateItem(item.id!, { qtyUnit: e.target.value })}
+                                    />
+                                  </div>
+                                  <span className="print-only" style={{ fontWeight: 600 }}>
+                                    {item.quantity} {item.qtyUnit || 'pcs'}
+                                  </span>
+                                </>
+                              ) : (
+                                <span style={{ color: 'var(--text-muted)' }}>—</span>
+                              )}
                             </td>
                             <td style={{ padding: '8px', textAlign: 'right', verticalAlign: 'middle' }}>
                               <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '2px' }}>
@@ -695,7 +706,7 @@ function QuotationListContent() {
                                 />
                               </div>
                               <span className="print-only" style={{ fontFamily: 'monospace' }}>
-                                {formatCustomCurrency(item.rate, item.currencySymbol || '₹')}
+                                {formatCustomCurrency(item.rate, item.currencySymbol || '₹')} / {item.hideSize ? (item.qtyUnit || 'pcs') : (item.sizeUnit || 'sq.ft')}
                               </span>
                             </td>
                             <td style={{ padding: '8px', textAlign: 'right', verticalAlign: 'middle' }}>

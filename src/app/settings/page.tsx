@@ -14,7 +14,7 @@ export default function SettingsPage() {
     syncData
   } = useQuotation();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'terms' | 'bank' | 'database'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'terms' | 'bank' | 'database' | 'offlineDb'>('profile');
 
   // Local state for configuration form fields
   const [companyName, setCompanyName] = useState('');
@@ -31,6 +31,11 @@ export default function SettingsPage() {
   const [supabaseKey, setSupabaseKey] = useState('');
   const [tursoUrl, setTursoUrl] = useState('');
   const [tursoToken, setTursoToken] = useState('');
+
+  // Offline directory states
+  const [folderName, setFolderName] = useState('');
+  const [lastSyncTime, setLastSyncTime] = useState('Never');
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -52,6 +57,28 @@ export default function SettingsPage() {
     setSupabaseKey(localStorage.getItem('glass_saas_supabase_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkZW9oZWtsaGN3Y2NpeHdhZW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNDQxNjEsImV4cCI6MjA5NjgyMDE2MX0.dLgKJ8Ay7zo91K4vyXC2uKMuAKhzj8rUPUb3b7PBKoA');
     setTursoUrl(localStorage.getItem('glass_saas_turso_url') || 'libsql://glassquote-khan-shanawaz.aws-ap-south-1.turso.io');
     setTursoToken(localStorage.getItem('glass_saas_turso_token') || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODEzMzE5MDAsImlkIjoiMDE5ZWJmYTctODYwMS03ODBkLTgwMzgtMTBhMjU2NTNmZDY4IiwicmlkIjoiZjBhN2M4MTMtMTgyYS00YzRjLTg1ZjEtMjZlNWRmMjJhNjdkIn0.-XJMdBrnP9jumN18a7yNIKsHfD0QZMkWf787iEAi0bN_tQtB8qBAbF-dKWAZyZIkV7p8cI--JQHpZd10PWbWCA');
+
+    // Load offline directory metadata
+    setFolderName(localStorage.getItem('duckdb_local_folder_name') || '');
+    setLastSyncTime(localStorage.getItem('duckdb_last_sync_timestamp') || 'Never');
+
+    const checkPermission = async () => {
+      try {
+        const { getFolderHandle } = await import('@/utils/duckdb');
+        const handle = await getFolderHandle();
+        if (handle) {
+          const opts = { mode: 'readwrite' as const };
+          const permission = await (handle as any).queryPermission(opts);
+          setIsAuthorized(permission === 'granted');
+          if (permission === 'granted') {
+            (window as any).localDatabaseFolderHandle = handle;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load folder handle or query permission:', e);
+      }
+    };
+    checkPermission();
   }, [companyProfile]);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,6 +145,65 @@ export default function SettingsPage() {
       resetCompanyProfile();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
+    }
+  };
+
+  const handleSelectFolder = async () => {
+    try {
+      if (!(window as any).showDirectoryPicker) {
+        alert('Your current browser environment does not support the File System Access API. Please use a modern Chromium browser.');
+        return;
+      }
+      const handle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
+      const { storeFolderHandle, syncDuckDBToFileStorage } = await import('@/utils/duckdb');
+      await storeFolderHandle(handle);
+      (window as any).localDatabaseFolderHandle = handle;
+      localStorage.setItem('duckdb_local_folder_name', handle.name);
+      setFolderName(handle.name);
+      setIsAuthorized(true);
+      alert(`Successfully linked workspace to your computer folder: "${handle.name}"`);
+      
+      // Execute initial flush
+      await syncDuckDBToFileStorage();
+      setLastSyncTime(localStorage.getItem('duckdb_last_sync_timestamp') || 'Never');
+    } catch (err) {
+      console.error('Folder selection rejected:', err);
+    }
+  };
+
+  const handleGrantPermission = async () => {
+    try {
+      const { getFolderHandle, verifyFolderPermission, syncDuckDBToFileStorage } = await import('@/utils/duckdb');
+      const handle = await getFolderHandle();
+      if (handle) {
+        const granted = await verifyFolderPermission(handle);
+        setIsAuthorized(granted);
+        if (granted) {
+          (window as any).localDatabaseFolderHandle = handle;
+          alert('Permission granted successfully.');
+          await syncDuckDBToFileStorage();
+          setLastSyncTime(localStorage.getItem('duckdb_last_sync_timestamp') || 'Never');
+        } else {
+          alert('Permission denied.');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to grant folder permission:', err);
+    }
+  };
+
+  const handleManualFlush = async () => {
+    try {
+      const { syncDuckDBToFileStorage } = await import('@/utils/duckdb');
+      const success = await syncDuckDBToFileStorage();
+      if (success) {
+        setLastSyncTime(localStorage.getItem('duckdb_last_sync_timestamp') || 'Never');
+        alert('Database snapshot successfully flushed to offline folder.');
+      } else {
+        alert('Failed to flush database. Make sure you have granted permission to access the folder.');
+      }
+    } catch (err) {
+      console.error('Failed to flush database to file:', err);
     }
   };
 
@@ -204,6 +290,23 @@ export default function SettingsPage() {
           }}
         >
           Cloud Database Config
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('offlineDb')}
+          style={{
+            padding: '12px 24px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'offlineDb' ? '2px solid var(--primary)' : '2px solid transparent',
+            color: activeTab === 'offlineDb' ? 'var(--primary)' : 'var(--text-primary)',
+            fontWeight: 700,
+            cursor: 'pointer',
+            fontSize: '1rem',
+            transition: 'all var(--transition-fast)'
+          }}
+        >
+          Offline Storage
         </button>
       </div>
 
@@ -569,6 +672,89 @@ export default function SettingsPage() {
               <ul style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <li>Rewrites the current local invoice database state to both Turso and Supabase.</li>
                 <li>Verify your network connection and credentials if the sync indicators turn red.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'offlineDb' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px', alignItems: 'start' }}>
+          <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px', color: 'var(--primary)' }}>
+              Local PC File Sync Engine (Offline Directory)
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Link a folder on your computer to save quotations offline. When online sync occurs or when manually triggered, a snapshot of your database will be written to this folder.
+            </p>
+
+            <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>LINKED DIRECTORY:</span>
+                <span style={{ fontWeight: 700, color: folderName ? 'var(--text-primary)' : 'var(--danger)' }}>
+                  {folderName || '🔴 NO FOLDER SELECTED'}
+                </span>
+              </div>
+              {folderName && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>ACCESS STATUS:</span>
+                  <span style={{ fontWeight: 700, color: isAuthorized ? 'var(--success)' : 'var(--warning)' }}>
+                    {isAuthorized ? '🟢 AUTHORIZED / CONNECTED' : '🟡 UNAUTHORIZED (REQUIRES GRANTED PERMISSION)'}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+              <button
+                type="button"
+                onClick={handleSelectFolder}
+                className="btn btn-primary"
+                style={{ flex: 1, padding: '12px' }}
+              >
+                📁 Locate & Connect Storage Folder
+              </button>
+
+              {folderName && !isAuthorized && (
+                <button
+                  type="button"
+                  onClick={handleGrantPermission}
+                  className="btn btn-warning"
+                  style={{ flex: 1, padding: '12px' }}
+                >
+                  🔓 Grant Write Permission
+                </button>
+              )}
+            </div>
+
+            {folderName && isAuthorized && (
+              <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '16px', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={handleManualFlush}
+                  className="btn btn-secondary"
+                  style={{ width: '100%', padding: '12px' }}
+                >
+                  💾 Flush Database Snapshot to Local File
+                </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  <span>Last Local Backup:</span>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{lastSyncTime}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px', color: 'var(--warning)' }}>
+              Offline Directory Instructions
+            </h3>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '12px', lineHeight: '1.5' }}>
+              <p>The offline storage mode runs locally inside your browser:</p>
+              <ul style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <li><strong>Privacy First:</strong> Your database resides in the browser's Origin Private File System (OPFS) and is completely private.</li>
+                <li><strong>Local Backups:</strong> Linking a folder allows the app to dump a backup file (`glass_quotations_local.duckdb`) directly to your hard drive.</li>
+                <li><strong>Permission Restrictions:</strong> Security rules require you to authorize the directory connection each time you restart the browser. Click the "Grant Write Permission" button to re-authorize when needed.</li>
               </ul>
             </div>
           </div>

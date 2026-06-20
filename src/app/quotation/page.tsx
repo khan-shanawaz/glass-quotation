@@ -39,6 +39,8 @@ export default function QuotationCreatorPage() {
   const [sizeSqFt, setSizeSqFt] = useState('');
   const [quantity, setQuantity] = useState('');
   const [rate, setRate] = useState('120');
+  const [hideSize, setHideSize] = useState(false);
+  const [hideQty, setHideQty] = useState(false);
 
   const [isEditingCategories, setIsEditingCategories] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -54,13 +56,15 @@ export default function QuotationCreatorPage() {
 
   useEffect(() => {
     const item: Partial<GlassItemInput> = {
-      sizeSqFt: Math.max(0, safeNumber(sizeSqFt, 0)),
-      quantity: Math.max(1, safeNumber(quantity, 1)),
+      sizeSqFt: hideSize ? 1 : Math.max(0, safeNumber(sizeSqFt, 0)),
+      quantity: hideQty ? 1 : Math.max(1, safeNumber(quantity, 1)),
       rate: Math.max(0, safeNumber(rate, 0)),
+      hideSize,
+      hideQty
     };
     const res = calculateItemRow(item);
     setLiveResult(res);
-  }, [sizeSqFt, quantity, rate]);
+  }, [sizeSqFt, quantity, rate, hideSize, hideQty]);
 
   // Compute cumulative summary of items already in the draft list
   const summary = calculateQuoteSummary(
@@ -75,8 +79,8 @@ export default function QuotationCreatorPage() {
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const size = sizeSqFt === '' ? 0 : safeNumber(sizeSqFt, 0);
-    const qty = quantity === '' ? 1 : safeNumber(quantity, 1);
+    const size = hideSize ? 1 : (sizeSqFt === '' ? 0 : safeNumber(sizeSqFt, 0));
+    const qty = hideQty ? 1 : (quantity === '' ? 1 : safeNumber(quantity, 1));
     const itemRate = safeNumber(rate, 0);
 
     addDraftItem({
@@ -89,6 +93,8 @@ export default function QuotationCreatorPage() {
       qtyUnit: 'pcs',
       sizeUnit: 'sq.ft',
       currencySymbol: '₹',
+      hideSize,
+      hideQty
     });
 
     // Reset item configuration form
@@ -163,11 +169,21 @@ export default function QuotationCreatorPage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Item Title / Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Balcony French Window, Main Bath Mirror"
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label className="form-label" style={{ margin: 0 }}>Item Title / Name</label>
+                  <button
+                    type="button"
+                    onClick={() => setName(prev => prev + '\n')}
+                    className="btn btn-secondary"
+                    style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '4px', margin: 0 }}
+                  >
+                    + New Line
+                  </button>
+                </div>
+                <textarea
+                  placeholder="e.g., Balcony French Window&#10;Main Bath Mirror"
                   className="form-input"
+                  style={{ resize: 'vertical', minHeight: '60px', fontFamily: 'var(--font-sans)' }}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
@@ -186,31 +202,92 @@ export default function QuotationCreatorPage() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="form-group">
-                  <label className="form-label">{draft.sizeHeading || 'Size (Sq.Ft.)'}</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="e.g. 19.6"
-                    className="form-input font-mono"
-                    value={sizeSqFt}
-                    onChange={(e) => setSizeSqFt(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">{draft.unitHeading || 'Qty (Units)'}</label>
-                  <input
-                    type="number"
-                    placeholder="Qty"
-                    className="form-input font-mono"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                  />
-                </div>
+                {hideSize ? (
+                  <div 
+                    className="form-group" 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      border: '1px dashed var(--glass-border)', 
+                      borderRadius: 'var(--radius-sm)', 
+                      cursor: 'pointer', 
+                      height: '100%', 
+                      minHeight: '66px',
+                      background: 'rgba(255,255,255,0.01)'
+                    }} 
+                    onClick={() => setHideSize(false)}
+                  >
+                    <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600 }}>+ Add Size Label</span>
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label className="form-label" style={{ margin: 0 }}>{draft.sizeHeading || 'Size (Sq.Ft.)'}</label>
+                      <button
+                        type="button"
+                        onClick={() => setHideSize(true)}
+                        style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: '1.1rem', padding: '0 4px', lineHeight: '1', fontWeight: 700 }}
+                        title="Remove Size column"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g. 19.6"
+                      className="form-input font-mono"
+                      value={sizeSqFt}
+                      onChange={(e) => setSizeSqFt(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                {hideQty ? (
+                  <div 
+                    className="form-group" 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      border: '1px dashed var(--glass-border)', 
+                      borderRadius: 'var(--radius-sm)', 
+                      cursor: 'pointer', 
+                      height: '100%', 
+                      minHeight: '66px',
+                      background: 'rgba(255,255,255,0.01)'
+                    }} 
+                    onClick={() => setHideQty(false)}
+                  >
+                    <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600 }}>+ Add Qty Label</span>
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label className="form-label" style={{ margin: 0 }}>{draft.unitHeading || 'Qty (Units)'}</label>
+                      <button
+                        type="button"
+                        onClick={() => setHideQty(true)}
+                        style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: '1.1rem', padding: '0 4px', lineHeight: '1', fontWeight: 700 }}
+                        title="Remove Qty column"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      placeholder="Qty"
+                      className="form-input font-mono"
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="form-group">
-                <label className="form-label">Price / {draft.sizeHeading || 'Sq.Ft.'}</label>
+                <label className="form-label">Price / {hideSize ? (draft.unitHeading || 'Unit') : (draft.sizeHeading || 'Sq.Ft.')}</label>
                 <div style={{ position: 'relative', width: '100%' }}>
                   <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', lineHeight: '1' }}>₹</span>
                   <input
@@ -230,14 +307,20 @@ export default function QuotationCreatorPage() {
               {/* Live Calculations Preview for Single Item */}
               {liveResult && (
                 <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: '16px', marginTop: '8px', fontSize: '0.85rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>{draft.sizeHeading || 'Size'}:</span>
-                    <span style={{ fontWeight: 600 }}>{safeNumber(sizeSqFt, 0).toFixed(2)}</span>
-                  </div>
+                  {!hideSize && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>{draft.sizeHeading || 'Size'}:</span>
+                      <span style={{ fontWeight: 600 }}>{safeNumber(sizeSqFt, 0).toFixed(2)}</span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Formula:</span>
                     <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                      {safeNumber(sizeSqFt, 0).toFixed(2)} × {safeNumber(quantity, 1)} qty × ₹{safeNumber(rate, 0)}
+                      {!hideSize && `${safeNumber(sizeSqFt, 0).toFixed(2)}`}
+                      {!hideSize && !hideQty && ` × `}
+                      {!hideQty && `${safeNumber(quantity, 1)} qty`}
+                      {(!hideSize || !hideQty) && ` × `}
+                      ₹{safeNumber(rate, 0)}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--glass-border)', paddingTop: '8px', marginTop: '8px', fontSize: '1rem' }}>
@@ -360,10 +443,9 @@ export default function QuotationCreatorPage() {
                         return (
                           <tr key={item.id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
                             <td style={{ padding: '12px 8px', verticalAlign: 'middle' }}>
-                              <input
-                                type="text"
+                              <textarea
                                 className="table-inline-input"
-                                style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)', width: '100%', marginBottom: '4px' }}
+                                style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)', width: '100%', marginBottom: '4px', resize: 'vertical', minHeight: '36px', height: 'auto', display: 'block', fontFamily: 'var(--font-sans)', borderBottom: '1px dashed var(--glass-border)' }}
                                 value={item.name}
                                 onChange={(e) => updateDraftItem(item.id!, { name: e.target.value })}
                                 placeholder="Item Name"
@@ -371,7 +453,7 @@ export default function QuotationCreatorPage() {
                               <input
                                 type="text"
                                 className="table-inline-input"
-                                style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', width: '100%' }}
+                                style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', width: '100%', borderBottom: '1px dashed var(--glass-border)' }}
                                 value={item.description || ''}
                                 onChange={(e) => updateDraftItem(item.id!, { description: e.target.value })}
                                 placeholder="Specifications (optional)"
@@ -379,38 +461,49 @@ export default function QuotationCreatorPage() {
                             </td>
                             <td style={{ padding: '12px 8px', color: 'var(--text-secondary)', verticalAlign: 'middle' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.85rem', flexWrap: 'wrap' }}>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  className="table-inline-input font-mono"
-                                  style={{ width: '38px', padding: '2px', textAlign: 'center', borderBottom: '1px dashed var(--glass-border)' }}
-                                  value={item.quantity}
-                                  onChange={(e) => updateDraftItem(item.id!, { quantity: Math.max(1, Math.floor(safeNumber(e.target.value, 1))) })}
-                                />
-                                <input
-                                  type="text"
-                                  className="table-inline-input"
-                                  style={{ width: '32px', padding: '2px', textAlign: 'center', fontSize: '0.8rem', borderBottom: '1px dashed var(--glass-border)' }}
-                                  value={item.qtyUnit || 'pcs'}
-                                  onChange={(e) => updateDraftItem(item.id!, { qtyUnit: e.target.value })}
-                                />
-                                <span>×</span>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0.01"
-                                  className="table-inline-input font-mono"
-                                  style={{ width: '50px', padding: '2px', textAlign: 'center', borderBottom: '1px dashed var(--glass-border)' }}
-                                  value={item.sizeSqFt}
-                                  onChange={(e) => updateDraftItem(item.id!, { sizeSqFt: Math.max(0.01, safeNumber(e.target.value, 0.01)) })}
-                                />
-                                <input
-                                  type="text"
-                                  className="table-inline-input"
-                                  style={{ width: '42px', padding: '2px', textAlign: 'center', fontSize: '0.8rem', borderBottom: '1px dashed var(--glass-border)' }}
-                                  value={item.sizeUnit || 'sq.ft'}
-                                  onChange={(e) => updateDraftItem(item.id!, { sizeUnit: e.target.value })}
-                                />
+                                {!item.hideQty && (
+                                  <>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      className="table-inline-input font-mono"
+                                      style={{ width: '38px', padding: '2px', textAlign: 'center', borderBottom: '1px dashed var(--glass-border)' }}
+                                      value={item.quantity}
+                                      onChange={(e) => updateDraftItem(item.id!, { quantity: Math.max(1, Math.floor(safeNumber(e.target.value, 1))) })}
+                                    />
+                                    <input
+                                      type="text"
+                                      className="table-inline-input"
+                                      style={{ width: '32px', padding: '2px', textAlign: 'center', fontSize: '0.8rem', borderBottom: '1px dashed var(--glass-border)' }}
+                                      value={item.qtyUnit || 'pcs'}
+                                      onChange={(e) => updateDraftItem(item.id!, { qtyUnit: e.target.value })}
+                                    />
+                                  </>
+                                )}
+                                {!item.hideQty && !item.hideSize && <span>×</span>}
+                                {!item.hideSize && (
+                                  <>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0.01"
+                                      className="table-inline-input font-mono"
+                                      style={{ width: '50px', padding: '2px', textAlign: 'center', borderBottom: '1px dashed var(--glass-border)' }}
+                                      value={item.sizeSqFt}
+                                      onChange={(e) => updateDraftItem(item.id!, { sizeSqFt: Math.max(0.01, safeNumber(e.target.value, 0.01)) })}
+                                    />
+                                    <input
+                                      type="text"
+                                      className="table-inline-input"
+                                      style={{ width: '42px', padding: '2px', textAlign: 'center', fontSize: '0.8rem', borderBottom: '1px dashed var(--glass-border)' }}
+                                      value={item.sizeUnit || 'sq.ft'}
+                                      onChange={(e) => updateDraftItem(item.id!, { sizeUnit: e.target.value })}
+                                    />
+                                  </>
+                                )}
+                                {(item.hideSize && item.hideQty) && (
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Flat Item</span>
+                                )}
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.75rem', marginTop: '6px', color: 'var(--primary)', flexWrap: 'wrap' }}>
                                 <span>Rate:</span>
@@ -434,8 +527,8 @@ export default function QuotationCreatorPage() {
                                   type="text"
                                   className="table-inline-input"
                                   style={{ width: '42px', padding: '2px', color: 'var(--primary)', fontSize: '0.75rem', borderBottom: '1px dashed var(--glass-border)' }}
-                                  value={item.sizeUnit || 'sq.ft'}
-                                  onChange={(e) => updateDraftItem(item.id!, { sizeUnit: e.target.value })}
+                                  value={item.hideSize ? (item.qtyUnit || 'pcs') : (item.sizeUnit || 'sq.ft')}
+                                  onChange={(e) => updateDraftItem(item.id!, item.hideSize ? { qtyUnit: e.target.value } : { sizeUnit: e.target.value })}
                                 />
                               </div>
                             </td>

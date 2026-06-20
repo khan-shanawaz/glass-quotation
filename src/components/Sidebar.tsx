@@ -19,7 +19,8 @@ export default function Sidebar() {
     isSyncing,
     lastSynced,
     syncStatus,
-    syncData
+    syncData,
+    hasUnsyncedChanges
   } = useQuotation();
 
   const menuItems: MenuItem[] = [
@@ -169,7 +170,24 @@ export default function Sidebar() {
       </div>
 
       <div>
-        <div className="sidebar-sync-container">
+        <div className="sidebar-sync-container" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {!sidebarCollapsed && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.7rem', color: 'var(--text-secondary)', padding: '0 4px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>
+              <span 
+                style={{ 
+                  width: '6px', 
+                  height: '6px', 
+                  borderRadius: '50%', 
+                  backgroundColor: syncStatus === 'error' ? '#ef4444' : hasUnsyncedChanges ? '#f59e0b' : '#10b981', 
+                  boxShadow: `0 0 6px ${syncStatus === 'error' ? '#ef4444' : hasUnsyncedChanges ? '#f59e0b' : '#10b981'}`,
+                  display: 'inline-block' 
+                }}
+              />
+              <span>
+                {isSyncing ? 'Syncing...' : syncStatus === 'error' ? 'Sync Error' : hasUnsyncedChanges ? 'Offline - Unsynced' : 'Online - Synced'}
+              </span>
+            </div>
+          )}
           <button
             onClick={syncData}
             disabled={isSyncing}

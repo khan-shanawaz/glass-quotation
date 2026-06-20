@@ -12,6 +12,8 @@ export interface GlassItemInput {
   sizeUnit?: string;
   currencySymbol?: string;
   customTotal?: number;
+  hideSize?: boolean;
+  hideQty?: boolean;
 }
 
 export interface CalculationResult {
@@ -79,12 +81,12 @@ export function formatRupee(val: number): string {
  * Calculates pricing for a single item row.
  */
 export function calculateItemRow(item: Partial<GlassItemInput>): CalculationResult {
-  const sizeSqFt = Math.max(0, safeNumber(item.sizeSqFt, 0));
-  const quantity = Math.max(0, Math.floor(safeNumber(item.quantity, 1)));
+  const sizeSqFt = item.hideSize ? 1 : Math.max(0, safeNumber(item.sizeSqFt, 0));
+  const quantity = item.hideQty ? 1 : Math.max(0, Math.floor(safeNumber(item.quantity, 1)));
   const rate = Math.max(0, safeNumber(item.rate, 0));
 
   // Calculate pricing using exact Sq.Ft. (no rounding)
-  const billedSqFt = sizeSqFt;
+  const billedSqFt = item.hideSize ? 1 : sizeSqFt;
   
   // Total cost: Sq.Ft. * Quantity * Rate (with manual customTotal override)
   const calculatedTotal = billedSqFt * quantity * rate;
@@ -93,7 +95,7 @@ export function calculateItemRow(item: Partial<GlassItemInput>): CalculationResu
     : calculatedTotal;
 
   return {
-    rawSqFt: sizeSqFt * quantity,
+    rawSqFt: (item.hideSize ? 1 : sizeSqFt) * (item.hideQty ? 1 : quantity),
     billedSqFt,
     itemTotal: isNaN(itemTotal) || !isFinite(itemTotal) ? 0 : itemTotal
   };
@@ -123,6 +125,8 @@ export function calculateQuoteSummary(
       sizeUnit: item.sizeUnit || 'sq.ft',
       currencySymbol: item.currencySymbol || '₹',
       customTotal: item.customTotal,
+      hideSize: item.hideSize || false,
+      hideQty: item.hideQty || false,
     };
 
     return {

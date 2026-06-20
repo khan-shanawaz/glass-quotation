@@ -154,8 +154,13 @@ export async function POST(request: Request) {
     }
 
     if (savedQuotations && Array.isArray(savedQuotations)) {
-      // Clear and re-populate for simplicity
-      await dbTurso.execute("DELETE FROM saved_quotations;");
+      // Incremental sync: insert/replace existing and delete missing ones
+      if (savedQuotations.length > 0) {
+        const ids = savedQuotations.map(q => `'${q.id.replace(/'/g, "''")}'`).join(',');
+        await dbTurso.execute(`DELETE FROM saved_quotations WHERE id NOT IN (${ids});`);
+      } else {
+        await dbTurso.execute("DELETE FROM saved_quotations;");
+      }
       for (const q of savedQuotations) {
         await dbTurso.execute({
           sql: `INSERT OR REPLACE INTO saved_quotations (id, quoteNumber, date, customerName, customerPhone, customerEmail, notes, items, discount, isDiscountFlat, transportCharges, labourCharges, isTaxEnabled, summary, isConvertedToProject, sizeHeading, unitHeading, documentTitle)
@@ -185,7 +190,12 @@ export async function POST(request: Request) {
     }
 
     if (projects && Array.isArray(projects)) {
-      await dbTurso.execute("DELETE FROM projects;");
+      if (projects.length > 0) {
+        const ids = projects.map(p => `'${p.id.replace(/'/g, "''")}'`).join(',');
+        await dbTurso.execute(`DELETE FROM projects WHERE id NOT IN (${ids});`);
+      } else {
+        await dbTurso.execute("DELETE FROM projects;");
+      }
       for (const p of projects) {
         await dbTurso.execute({
           sql: `INSERT OR REPLACE INTO projects (id, quoteId, quoteNumber, customerName, customerPhone, amount, status, dateCreated, tasks)
@@ -196,7 +206,12 @@ export async function POST(request: Request) {
     }
 
     if (customers && Array.isArray(customers)) {
-      await dbTurso.execute("DELETE FROM customers;");
+      if (customers.length > 0) {
+        const ids = customers.map(c => `'${c.id.replace(/'/g, "''")}'`).join(',');
+        await dbTurso.execute(`DELETE FROM customers WHERE id NOT IN (${ids});`);
+      } else {
+        await dbTurso.execute("DELETE FROM customers;");
+      }
       for (const c of customers) {
         await dbTurso.execute({
           sql: `INSERT OR REPLACE INTO customers (id, name, phone, email, totalOrdersAmount, totalQuotationsCount, lastActive)
@@ -207,7 +222,12 @@ export async function POST(request: Request) {
     }
 
     if (categories && Array.isArray(categories)) {
-      await dbTurso.execute("DELETE FROM categories;");
+      if (categories.length > 0) {
+        const names = categories.map(name => `'${name.replace(/'/g, "''")}'`).join(',');
+        await dbTurso.execute(`DELETE FROM categories WHERE name NOT IN (${names});`);
+      } else {
+        await dbTurso.execute("DELETE FROM categories;");
+      }
       for (const name of categories) {
         await dbTurso.execute({
           sql: "INSERT OR IGNORE INTO categories (name) VALUES (?);",
@@ -257,10 +277,12 @@ export async function POST(request: Request) {
             document_title: q.documentTitle || 'QUOTATION',
           }));
           
-          // Truncate and upsert
-          await dbSupabase.from('saved_quotations').delete().neq('id', 'dummy');
           if (formattedQuotes.length > 0) {
             await dbSupabase.from('saved_quotations').upsert(formattedQuotes);
+            const ids = formattedQuotes.map(q => q.id);
+            await dbSupabase.from('saved_quotations').delete().not('id', 'in', ids);
+          } else {
+            await dbSupabase.from('saved_quotations').delete().neq('id', 'dummy');
           }
         }
 
@@ -276,9 +298,12 @@ export async function POST(request: Request) {
             status: p.status,
             date_created: p.dateCreated,
           }));
-          await dbSupabase.from('projects').delete().neq('id', 'dummy');
           if (formattedProjects.length > 0) {
             await dbSupabase.from('projects').upsert(formattedProjects);
+            const ids = formattedProjects.map(p => p.id);
+            await dbSupabase.from('projects').delete().not('id', 'in', ids);
+          } else {
+            await dbSupabase.from('projects').delete().neq('id', 'dummy');
           }
         }
 
@@ -293,18 +318,24 @@ export async function POST(request: Request) {
             total_quotations_count: c.totalQuotationsCount || 0,
             last_active: c.lastActive,
           }));
-          await dbSupabase.from('customers').delete().neq('id', 'dummy');
           if (formattedCustomers.length > 0) {
             await dbSupabase.from('customers').upsert(formattedCustomers);
+            const ids = formattedCustomers.map(c => c.id);
+            await dbSupabase.from('customers').delete().not('id', 'in', ids);
+          } else {
+            await dbSupabase.from('customers').delete().neq('id', 'dummy');
           }
         }
 
         // Sync Categories
         if (categories && Array.isArray(categories)) {
           const formattedCategories = categories.map(name => ({ name }));
-          await dbSupabase.from('categories').delete().neq('name', 'dummy');
           if (formattedCategories.length > 0) {
             await dbSupabase.from('categories').upsert(formattedCategories);
+            const names = formattedCategories.map(c => c.name);
+            await dbSupabase.from('categories').delete().not('name', 'in', names);
+          } else {
+            await dbSupabase.from('categories').delete().neq('name', 'dummy');
           }
         }
       } catch (sbErr) {
