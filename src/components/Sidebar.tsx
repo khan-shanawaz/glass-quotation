@@ -96,6 +96,20 @@ export default function Sidebar() {
       ),
     },
     {
+      name: 'Measurements',
+      path: '/measurements',
+      icon: (
+        <svg fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21.3 8.7L8.7 21.3c-1 1-2.5 1-3.5 0l-2.8-2.8c-1-1-1-2.5 0-3.5L15.3 2.7c1-1 2.5-1 3.5 0l2.8 2.8c1 1 1 2.5 0 3.5z" />
+          <line x1="6" y1="18" x2="4.5" y2="16.5" />
+          <line x1="9" y1="15" x2="7.5" y2="13.5" />
+          <line x1="12" y1="12" x2="10.5" y2="10.5" />
+          <line x1="15" y1="9" x2="13.5" y2="7.5" />
+          <line x1="18" y1="6" x2="16.5" y2="4.5" />
+        </svg>
+      ),
+    },
+    {
       name: 'Print Preview & Edit',
       path: '/print-preview',
       icon: (
