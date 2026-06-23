@@ -657,3 +657,32 @@ a {
   from { transform: translateY(24px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
+/* Sidebar Section Headers & Sublinks */
+.sidebar-section-header {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 16px 16px 4px;
+  user-select: none;
+}
+
+.sidebar-sublink {
+  font-size: 0.9rem !important;
+}
+
+.sidebar-sublink svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.sidebar:not(.sidebar-collapsed) .sidebar-sublink {
+  padding-left: 28px !important;
+}
+
+.sidebar-divider {
+  width: 100%;
+  border: 0;
+}

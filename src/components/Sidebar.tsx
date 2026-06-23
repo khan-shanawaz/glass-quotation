@@ -7,8 +7,10 @@ import { useQuotation } from '@/context/QuotationContext';
 
 interface MenuItem {
   name: string;
-  path: string;
-  icon: React.ReactNode;
+  path?: string;
+  icon?: React.ReactNode;
+  isHeader?: boolean;
+  isSubmenu?: boolean;
 }
 
 export default function Sidebar() {
@@ -83,8 +85,13 @@ export default function Sidebar() {
       ),
     },
     {
-      name: 'Inch To Sq.Ft',
-      path: '/converter',
+      isHeader: true,
+      name: 'Converters',
+    },
+    {
+      name: 'Inches to Sq.Ft',
+      path: '/converters/inches',
+      isSubmenu: true,
       icon: (
         <svg fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="2" y="7" width="20" height="10" rx="2" ry="2" />
@@ -92,6 +99,22 @@ export default function Sidebar() {
           <line x1="10" y1="7" x2="10" y2="10" />
           <line x1="14" y1="7" x2="14" y2="12" />
           <line x1="18" y1="7" x2="18" y2="10" />
+        </svg>
+      ),
+    },
+    {
+      name: 'MM to Sq.Ft',
+      path: '/converters/mm',
+      isSubmenu: true,
+      icon: (
+        <svg fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="7" width="20" height="10" rx="2" ry="2" />
+          <line x1="5" y1="7" x2="5" y2="10" />
+          <line x1="8" y1="7" x2="8" y2="12" />
+          <line x1="11" y1="7" x2="11" y2="10" />
+          <line x1="14" y1="7" x2="14" y2="12" />
+          <line x1="17" y1="7" x2="17" y2="10" />
+          <line x1="20" y1="7" x2="20" y2="12" />
         </svg>
       ),
     },
@@ -164,13 +187,33 @@ export default function Sidebar() {
 
         <nav>
           <ul className="sidebar-menu">
-            {menuItems.map((item) => {
+            {menuItems.map((item, idx) => {
+              if (item.isHeader) {
+                if (sidebarCollapsed) {
+                  return (
+                    <li 
+                      key={`header-${idx}`} 
+                      className="sidebar-divider" 
+                      style={{ 
+                        borderTop: '1px solid var(--glass-border)', 
+                        margin: '12px 0 4px',
+                        width: '100%'
+                      }} 
+                    />
+                  );
+                }
+                return (
+                  <li key={`header-${idx}`} className="sidebar-section-header">
+                    {item.name}
+                  </li>
+                );
+              }
               const isActive = pathname === item.path;
               return (
-                <li key={item.path}>
+                <li key={item.path || `menu-item-${idx}`}>
                   <Link
-                    href={item.path}
-                    className={`sidebar-link ${isActive ? 'sidebar-link-active' : ''}`}
+                    href={item.path || '#'}
+                    className={`sidebar-link ${isActive ? 'sidebar-link-active' : ''} ${item.isSubmenu ? 'sidebar-sublink' : ''}`}
                     title={sidebarCollapsed ? item.name : undefined}
                   >
                     {item.icon}
